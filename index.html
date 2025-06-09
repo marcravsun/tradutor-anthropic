@@ -244,6 +244,11 @@
             display: block;
         }
 
+        .loading p {
+            margin: 10px 0;
+            color: #495057;
+        }
+
         .spinner {
             display: inline-block;
             width: 40px;
@@ -473,7 +478,10 @@
 
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Traduzindo...</p>
+            <p id="loadingText">Traduzindo...</p>
+            <p style="font-size: 14px; color: #86868b;">
+                <span id="progressText"></span>
+            </p>
         </div>
 
         <div class="error" id="error"></div>
@@ -684,7 +692,11 @@
 
             // Verificar tamanho do texto
             if (text.length > 100000) {
-                if (!confirm('Texto muito longo. A tradução pode demorar mais. Continuar?')) {
+                if (!confirm('⚠️ Texto muito longo (' + Math.round(text.length/1000) + 'k caracteres)\n\nA tradução pode demorar 2-5 minutos.\n\nDeseja continuar?')) {
+                    return;
+                }
+            } else if (text.length > 50000) {
+                if (!confirm('Texto longo (' + Math.round(text.length/1000) + 'k caracteres)\n\nA tradução pode demorar 1-2 minutos.\n\nDeseja continuar?')) {
                     return;
                 }
             }
@@ -692,6 +704,13 @@
             hideError();
             document.getElementById('translateButton').disabled = true;
             document.getElementById('resultSection').classList.remove('show');
+
+            // Adicionar timeout para evitar travamentos
+            const timeoutId = setTimeout(() => {
+                showError('A tradução está demorando muito. Tente um texto menor ou verifique sua conexão.');
+                showLoading(false);
+                document.getElementById('translateButton').disabled = false;
+            }, 120000); // 2 minutos de timeout
 
             try {
                 // Mostrar o estilo selecionado no loading
@@ -715,8 +734,18 @@
                 }
                 
                 showResult(translatedText);
+                clearTimeout(timeoutId); // Limpar timeout se sucesso
             } catch (error) {
-                showError('Erro na tradução: ' + error.message);
+                clearTimeout(timeoutId); // Limpar timeout se erro
+                if (error.message.includes('402')) {
+                    showError('Erro 402: Créditos insuficientes na API. Verifique seu saldo em console.anthropic.com');
+                } else if (error.message.includes('401')) {
+                    showError('Erro 401: Chave API inválida. Verifique se está correta.');
+                } else if (error.message.includes('429')) {
+                    showError('Erro 429: Muitas requisições. Aguarde um momento e tente novamente.');
+                } else {
+                    showError('Erro na tradução: ' + error.message);
+                }
             } finally {
                 showLoading(false);
                 document.getElementById('translateButton').disabled = false;
@@ -881,10 +910,34 @@ Retorne apenas a tradução, sem comentários adicionais.`;
         function showLoading(show, message = 'Traduzindo...') {
             const loadingEl = document.getElementById('loading');
             if (show) {
-                loadingEl.querySelector('p').textContent = message;
+                document.getElementById('loadingText').textContent = message;
                 loadingEl.classList.add('show');
+                
+                // Atualizar progresso a cada 5 segundos
+                let seconds = 0;
+                const progressInterval = setInterval(() => {
+                    seconds += 5;
+                    const progressEl = document.getElementById('progressText');
+                    if (seconds < 30) {
+                        progressEl.textContent = 'Processando texto...';
+                    } else if (seconds < 60) {
+                        progressEl.textContent = 'Isto pode levar alguns momentos...';
+                    } else {
+                        progressEl.textContent = 'Texto longo - aguarde mais um pouco...';
+                    }
+                    
+                    if (!loadingEl.classList.contains('show')) {
+                        clearInterval(progressInterval);
+                    }
+                }, 5000);
+                
+                loadingEl.progressInterval = progressInterval;
             } else {
+                if (loadingEl.progressInterval) {
+                    clearInterval(loadingEl.progressInterval);
+                }
                 loadingEl.classList.remove('show');
+                document.getElementById('progressText').textContent = '';
             }
         }
 
