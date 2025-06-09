@@ -458,7 +458,7 @@
 
         <div class="file-info" id="fileInfo">
             <span class="file-name" id="fileName"></span>
-            <button class="remove-file" onclick="removeFile()">Remover</button>
+            <button class="remove-file" id="removeFileBtn">Remover</button>
         </div>
 
         <div class="form-group">
@@ -472,7 +472,7 @@
             </div>
         </div>
 
-        <button class="button" id="translateButton" onclick="translate()">
+        <button class="button" id="translateButton">
             Traduzir
         </button>
 
@@ -490,10 +490,10 @@
             <div class="result-header">
                 <h3 class="result-title">Tradução</h3>
                 <div class="result-actions">
-                    <button class="small-button copy-button" onclick="copyResult()">
+                    <button class="small-button copy-button" id="copyBtn">
                         Copiar
                     </button>
-                    <button class="small-button download-button" onclick="downloadResult()">
+                    <button class="small-button download-button" id="downloadBtn">
                         Baixar
                     </button>
                 </div>
@@ -541,6 +541,12 @@
             document.querySelector('.char-count').innerHTML = 
                 `<span id="charCount">${charCount.toLocaleString('pt-BR')}</span> caracteres${timeEstimate}`;
         }
+
+        // Configurar eventos dos botões
+        document.getElementById('translateButton').addEventListener('click', translate);
+        document.getElementById('removeFileBtn').addEventListener('click', removeFile);
+        document.getElementById('copyBtn').addEventListener('click', copyResult);
+        document.getElementById('downloadBtn').addEventListener('click', downloadResult);
 
         // Configurar eventos de upload
         const uploadArea = document.getElementById('uploadArea');
