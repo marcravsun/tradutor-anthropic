@@ -786,83 +786,32 @@
         }
 
         async function callAnthropicAPI(apiKey, text, sourceLang, targetLang, style) {
-            const languageNames = {
-                'auto': 'idioma original',
-                'pt-BR': 'português brasileiro',
-                'pt-PT': 'português de Portugal',
-                'en': 'inglês',
-                'es': 'espanhol',
-                'fr': 'francês',
-                'de': 'alemão',
-                'it': 'italiano',
-                'ja': 'japonês',
-                'ko': 'coreano',
-                'zh': 'chinês'
-            };
+            try {
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        apiKey,
+                        text,
+                        sourceLang,
+                        targetLang,
+                        style
+                    })
+                });
 
-            const styleInstructions = {
-                'intelligent': `Você é um tradutor excepcionalmente habilidoso com profundo conhecimento cultural de ambos os idiomas. 
+                const data = await response.json();
 
-Sua missão é criar a tradução PERFEITA que:
-- Capture TODOS os significados, incluindo nuances e subtextos
-- Transponha expressões idiomáticas para equivalentes culturais perfeitos (não traduza literalmente "kick the bucket" como "chutar o balde", mas como "bater as botas")
-- Preserve o estilo do autor: formal/informal, poético/direto, humor/seriedade
-- Mantenha o impacto emocional idêntico ao original
-- Adapte referências culturais quando necessário (ex: "Super Bowl" pode virar "final da Copa do Mundo" se fizer mais sentido no contexto)
-- Reconheça e preserve jogos de palavras, criando equivalentes quando possível
-- Identifique o público-alvo e adapte apropriadamente
-- Mantenha consistência de termos técnicos ao longo do texto
-- Preserve formatação, ênfases e estrutura onde faça sentido
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro na tradução');
+                }
 
-Em resumo: faça o texto parecer que foi PENSADO e ESCRITO originalmente no idioma de destino, não apenas traduzido.`,
-                
-                'faithful': `Traduza de forma extremamente fiel ao texto original. Mantenha a estrutura das frases o mais próxima possível do original. Preserve todas as nuances e detalhes, mesmo que isso resulte em construções menos naturais no idioma de destino.`,
-                
-                'fluent': `Priorize a fluência e naturalidade no idioma de destino. Adapte livremente a estrutura das frases para que soem como se tivessem sido escritas originalmente nesse idioma. Mantenha o significado geral, mas priorize a leitura fluida.`,
-                
-                'creative': `Traduza com liberdade criativa, especialmente adequada para textos literários. Preserve o impacto emocional, o estilo e a beleza do texto. Use recursos poéticos e estilísticos do idioma de destino para recriar o efeito do original.`,
-                
-                'simplified': `Simplifique o texto durante a tradução. Use vocabulário mais comum, frases mais curtas e estruturas mais simples. Torne o texto mais acessível sem perder informações essenciais. Ideal para manuais e textos didáticos.`,
-                
-                'formal': `Use um registro formal e profissional. Escolha vocabulário sofisticado e construções elegantes. Evite contrações e expressões coloquiais. Mantenha um tom sério e respeitoso apropriado para contextos corporativos ou acadêmicos.`,
-                
-                'informal': `Use um tom casual e descontraído. Inclua contrações, expressões coloquiais apropriadas e um estilo conversacional. Faça o texto soar como uma conversa natural entre amigos, quando apropriado ao contexto.`
-            };
-
-            const systemPrompt = `Você é um tradutor profissional especializado. 
-
-${styleInstructions[style]}
-
-Traduza o texto${sourceLang === 'auto' ? '' : ' do ' + languageNames[sourceLang]} para ${languageNames[targetLang]}.
-Mantenha toda a formatação original, incluindo quebras de linha e parágrafos.
-Retorne apenas a tradução, sem comentários adicionais.`;
-
-            const response = await fetch('https://api.anthropic.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-api-key': apiKey,
-                    'anthropic-version': '2023-06-01'
-                },
-                body: JSON.stringify({
-                    model: 'claude-3-5-sonnet-20241022',
-                    max_tokens: 4096,
-                    temperature: style === 'creative' ? 0.7 : 0.3,
-                    system: systemPrompt,
-                    messages: [{
-                        role: 'user',
-                        content: text
-                    }]
-                })
-            });
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error?.message || 'Erro na API');
+                return data.translation;
+            } catch (error) {
+                console.error('Erro na API:', error);
+                throw error;
             }
-
-            const data = await response.json();
-            return data.content[0].text;
         }
 
         function showResult(text) {
