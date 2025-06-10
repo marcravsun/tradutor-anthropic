@@ -710,6 +710,9 @@
                 }
             }
 
+            // Ajustar limite para forçar divisão em textos menores
+            const chunkSize = 10000; // Reduzido de 50000 para 10000
+
             hideError();
             document.getElementById('translateButton').disabled = true;
             document.getElementById('resultSection').classList.remove('show');
@@ -735,7 +738,7 @@
                 const loadingMessage = `Traduzindo (Estilo: ${styleNames[style]})...`;
                 
                 // Para textos muito grandes, dividir em chunks
-                if (text.length > 50000) {
+                if (text.length > chunkSize) {
                     translatedText = await translateLargeText(apiKey, text, sourceLang, targetLang, style);
                 } else {
                     showLoading(true, loadingMessage);
@@ -768,7 +771,7 @@
             let currentChunk = '';
             
             for (const paragraph of paragraphs) {
-                if ((currentChunk + paragraph).length > 30000) {
+                if ((currentChunk + paragraph).length > 10000) { // Reduzido de 30000
                     chunks.push(currentChunk);
                     currentChunk = paragraph;
                 } else {
@@ -828,7 +831,15 @@
         }
 
         function showResult(text) {
-            document.getElementById('resultText').textContent = text;
+            // Remover notas automáticas do Claude sobre tradução parcial
+            const cleanText = text
+                .replace(/\[CONTINUA\.\.\.?\]/g, '')
+                .replace(/\n?Nota: Devido ao limite.*/gs, '')
+                .replace(/\n?\[Nota: Esta é uma tradução parcial.*/gs, '')
+                .replace(/\n?Nota: Esta é apenas.*/gs, '')
+                .trim();
+            
+            document.getElementById('resultText').textContent = cleanText;
             document.getElementById('resultSection').classList.add('show');
             
             // Scroll suave até o resultado
