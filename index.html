@@ -734,7 +734,7 @@
                 showError('A tradução está demorando muito. Tente um texto menor ou verifique sua conexão.');
                 showLoading(false);
                 document.getElementById('translateButton').disabled = false;
-            }, 120000); // 2 minutos de timeout
+            }, 300000); // 5 minutos de timeout (aumentado de 2)
 
             try {
                 // Mostrar o estilo selecionado no loading
@@ -796,8 +796,15 @@
             const translations = [];
             for (let i = 0; i < chunks.length; i++) {
                 showLoading(true, `Traduzindo parte ${i + 1} de ${chunks.length}...`);
-                const translated = await callAnthropicAPI(apiKey, chunks[i], sourceLang, targetLang, style);
-                translations.push(translated);
+                try {
+                    const translated = await callAnthropicAPI(apiKey, chunks[i], sourceLang, targetLang, style);
+                    if (translated && translated.trim()) {
+                        translations.push(translated);
+                    }
+                } catch (err) {
+                    console.error(`Erro na parte ${i + 1}:`, err);
+                    // Continua com as outras partes mesmo se uma falhar
+                }
             }
             
             return translations.join('\n\n');
