@@ -324,13 +324,78 @@
             background: #e8e8ed;
         }
 
-        .download-button {
-            background: #0071e3;
-            color: white;
+        .download-menu {
+            position: relative;
+            display: inline-block;
         }
 
-        .download-button:hover {
-            background: #0077ed;
+        .download-options {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 8px;
+            min-width: 150px;
+            right: 0;
+            top: 100%;
+            margin-top: 4px;
+            z-index: 10;
+        }
+
+        .download-options.show {
+            display: block;
+        }
+
+        .download-option {
+            display: block;
+            padding: 8px 12px;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1d1d1f;
+            transition: background 0.2s;
+        }
+
+        .download-option:hover {
+            background: #f5f5f7;
+        }
+
+        .format-preview {
+            background: #f5f5f7;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 16px;
+            margin-top: 16px;
+            display: none;
+            font-size: 14px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .format-preview.show {
+            display: block;
+        }
+
+        .format-preview h3 {
+            font-size: 16px;
+            margin-bottom: 8px;
+            color: #1d1d1f;
+        }
+
+        .format-preview pre {
+            background: white;
+            padding: 12px;
+            border-radius: 4px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
         }
 
         .result-text {
@@ -426,9 +491,9 @@
             <div>
                 <label for="targetLang">Idioma de destino</label>
                 <select id="targetLang">
-                    <option value="pt-BR">Português (Brasil)</option>
+                    <option value="pt-BR" selected>Português (Brasil)</option>
                     <option value="pt-PT">Português (Portugal)</option>
-                    <option value="en" selected>Inglês</option>
+                    <option value="en">Inglês</option>
                     <option value="es">Espanhol</option>
                     <option value="fr">Francês</option>
                     <option value="de">Alemão</option>
@@ -500,13 +565,30 @@
                     <button class="small-button copy-button" id="copyBtn">
                         Copiar
                     </button>
-                    <button class="small-button download-button" id="downloadBtn">
-                        Baixar
-                    </button>
+                    <div class="download-menu">
+                        <button class="small-button download-button" id="downloadBtn" style="background: #0071e3; color: white;">
+                            Baixar ▼
+                        </button>
+                        <div class="download-options" id="downloadOptions">
+                            <button class="download-option" onclick="downloadHTML()">
+                                📄 HTML Formatado
+                            </button>
+                            <button class="download-option" onclick="downloadMarkdown()">
+                                📝 Markdown
+                            </button>
+                            <button class="download-option" onclick="downloadTXT()">
+                                📃 Texto Simples
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="result-text" id="resultText"></div>
             <div class="result-info" id="resultInfo"></div>
+            <div class="format-preview" id="formatPreview">
+                <h3>Preview do formato:</h3>
+                <pre id="previewContent"></pre>
+            </div>
         </div>
 
         <footer>
@@ -555,7 +637,17 @@
         document.getElementById('translateButton').addEventListener('click', translate);
         document.getElementById('removeFileBtn').addEventListener('click', removeFile);
         document.getElementById('copyBtn').addEventListener('click', copyResult);
-        document.getElementById('downloadBtn').addEventListener('click', downloadResult);
+        
+        // Menu de download
+        document.getElementById('downloadBtn').addEventListener('click', function(e) {
+            e.stopPropagation();
+            document.getElementById('downloadOptions').classList.toggle('show');
+        });
+
+        // Fechar menu ao clicar fora
+        document.addEventListener('click', function() {
+            document.getElementById('downloadOptions').classList.remove('show');
+        });
 
         // Configurar eventos de upload
         const uploadArea = document.getElementById('uploadArea');
@@ -798,13 +890,22 @@
                 showLoading(true, `Traduzindo parte ${i + 1} de ${chunks.length}...`);
                 try {
                     const translated = await callAnthropicAPI(apiKey, chunks[i], sourceLang, targetLang, style);
+                    console.log(`Parte ${i + 1}: ${translated ? translated.length + ' chars' : 'VAZIA'}`);
                     if (translated && translated.trim()) {
                         translations.push(translated);
+                    } else {
+                        console.error(`Parte ${i + 1} retornou vazia!`);
                     }
                 } catch (err) {
                     console.error(`Erro na parte ${i + 1}:`, err);
                     // Continua com as outras partes mesmo se uma falhar
                 }
+            }
+            
+            console.log(`Total de partes traduzidas: ${translations.length} de ${chunks.length}`);
+            
+            if (translations.length === 0) {
+                throw new Error('Nenhuma parte foi traduzida com sucesso');
             }
             
             return translations.join('\n\n');
@@ -850,6 +951,12 @@
         }
 
         function showResult(text) {
+            // Verificar se recebeu texto válido
+            if (!text || text.trim() === '') {
+                showError('Erro: A tradução retornou vazia. Tente novamente ou use um texto menor.');
+                return;
+            }
+            
             // Remover notas automáticas do Claude sobre tradução parcial
             const cleanText = text
                 .replace(/\[CONTINUA\.\.\.?\]/gi, '')
@@ -862,6 +969,12 @@
                 .replace(/\[.*?seguindo o mesmo padrão.*?\]/g, '')
                 .replace(/\n\n+/g, '\n\n') // Limpar quebras de linha extras
                 .trim();
+            
+            // Verificar se ainda tem conteúdo após limpeza
+            if (!cleanText) {
+                showError('Erro: A tradução foi processada mas retornou vazia.');
+                return;
+            }
             
             document.getElementById('resultText').textContent = cleanText;
             translatedText = cleanText; // Salvar texto limpo
@@ -899,7 +1012,10 @@
         }
 
         function downloadResult() {
-            // Criar documento formatado
+            downloadTXT(); // Comportamento padrão mantido
+        }
+
+        function downloadTXT() {
             const content = translatedText;
             const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
             const url = URL.createObjectURL(blob);
@@ -917,6 +1033,229 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        }
+
+        function downloadHTML() {
+            const htmlContent = convertToHTML(translatedText);
+            const fullHTML = `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradução - ${currentFileName || 'Documento'}</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            color: #333;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            margin-top: 1.5em;
+            margin-bottom: 0.5em;
+            line-height: 1.2;
+        }
+        p {
+            margin-bottom: 1em;
+        }
+        blockquote {
+            margin: 1em 0;
+            padding-left: 1em;
+            border-left: 3px solid #ddd;
+            color: #666;
+        }
+        ul, ol {
+            margin-bottom: 1em;
+        }
+        strong {
+            font-weight: 600;
+        }
+        em {
+            font-style: italic;
+        }
+        hr {
+            border: none;
+            border-top: 1px solid #ddd;
+            margin: 2em 0;
+        }
+        .metadata {
+            background: #f5f5f7;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 30px;
+        }
+        .metadata p {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="metadata">
+        <p><strong>Documento original:</strong> ${currentFileName || 'Texto inserido'}</p>
+        <p><strong>Data da tradução:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
+        <p><strong>Traduzido por:</strong> Anthropic Claude</p>
+    </div>
+    ${htmlContent}
+</body>
+</html>`;
+
+            const blob = new Blob([fullHTML], { type: 'text/html;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            let fileName = 'traducao.html';
+            if (currentFileName) {
+                const baseName = currentFileName.replace(/\.[^/.]+$/, '');
+                fileName = `${baseName}_traduzido.html`;
+            }
+            
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // Mostrar preview
+            showFormatPreview('HTML', fullHTML);
+        }
+
+        function downloadMarkdown() {
+            const markdownContent = convertToMarkdown(translatedText);
+            const fullContent = `# Tradução
+
+**Documento original:** ${currentFileName || 'Texto inserido'}  
+**Data:** ${new Date().toLocaleDateString('pt-BR')}  
+**Traduzido por:** Anthropic Claude
+
+---
+
+${markdownContent}`;
+
+            const blob = new Blob([fullContent], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            let fileName = 'traducao.md';
+            if (currentFileName) {
+                const baseName = currentFileName.replace(/\.[^/.]+$/, '');
+                fileName = `${baseName}_traduzido.md`;
+            }
+            
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+
+            // Mostrar preview
+            showFormatPreview('Markdown', fullContent);
+        }
+
+        function convertToHTML(text) {
+            // Escapar caracteres HTML
+            let html = text
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;');
+
+            // Detectar e formatar estruturas
+            html = html
+                // Títulos (linhas sozinhas em caps ou seguidas de sublinhado)
+                .replace(/^([A-Z][A-Z\s]+)$/gm, '<h2>$1</h2>')
+                .replace(/^(.+)\n[=]+$/gm, '<h1>$1</h1>')
+                .replace(/^(.+)\n[-]+$/gm, '<h2>$1</h2>')
+                
+                // Parágrafos
+                .split(/\n\n+/)
+                .map(para => {
+                    para = para.trim();
+                    if (para.startsWith('<h') || para === '') return para;
+                    
+                    // Listas
+                    if (para.match(/^[-*•]\s+/m)) {
+                        const items = para.split(/\n/).map(line => 
+                            line.replace(/^[-*•]\s+/, '<li>') + '</li>'
+                        ).join('\n');
+                        return `<ul>\n${items}\n</ul>`;
+                    }
+                    
+                    // Listas numeradas
+                    if (para.match(/^\d+\.\s+/m)) {
+                        const items = para.split(/\n/).map(line => 
+                            line.replace(/^\d+\.\s+/, '<li>') + '</li>'
+                        ).join('\n');
+                        return `<ol>\n${items}\n</ol>`;
+                    }
+                    
+                    // Citações (linhas começando com > ou ")
+                    if (para.match(/^[">]/)) {
+                        return `<blockquote>${para}</blockquote>`;
+                    }
+                    
+                    // Parágrafos normais
+                    return `<p>${para}</p>`;
+                })
+                .join('\n\n');
+
+            // Formatação inline
+            html = html
+                // Negrito
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/__([^_]+)__/g, '<strong>$1</strong>')
+                // Itálico
+                .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+                .replace(/_([^_]+)_/g, '<em>$1</em>');
+
+            return html;
+        }
+
+        function convertToMarkdown(text) {
+            let markdown = text;
+
+            // Detectar estruturas
+            markdown = markdown
+                // Títulos (linhas em CAPS)
+                .replace(/^([A-Z][A-Z\s]+)$/gm, '## $1')
+                
+                // Listas
+                .replace(/^[-•]\s+/gm, '- ')
+                .replace(/^\d+\.\s+/gm, (match, offset, string) => {
+                    const lineStart = string.lastIndexOf('\n', offset - 1) + 1;
+                    const lineNum = string.substring(0, offset).split(/^\d+\.\s+/m).length;
+                    return `${lineNum}. `;
+                });
+
+            // Adicionar quebras de linha extras para melhor formatação
+            markdown = markdown
+                .replace(/\n([A-Z])/g, '\n\n$1')
+                .replace(/\n\n\n+/g, '\n\n');
+
+            return markdown;
+        }
+
+        function showFormatPreview(format, content) {
+            const preview = document.getElementById('formatPreview');
+            const previewContent = document.getElementById('previewContent');
+            
+            preview.querySelector('h3').textContent = `Preview do ${format}:`;
+            
+            if (format === 'HTML') {
+                // Mostrar código HTML
+                previewContent.textContent = content.substring(0, 1000) + '...';
+            } else {
+                previewContent.textContent = content.substring(0, 500) + '...';
+            }
+            
+            preview.classList.add('show');
+            
+            // Auto-ocultar após 5 segundos
+            setTimeout(() => {
+                preview.classList.remove('show');
+            }, 5000);
         }
 
         function showLoading(show, message = 'Traduzindo...') {
