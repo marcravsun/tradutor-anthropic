@@ -22,9 +22,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { text, sourceLang, targetLang, style, apiKey } = req.body;
+    const { text, sourceLang, targetLang, style, apiKey, partIndex, totalParts } = req.body;
 
     console.log('Text length:', text?.length || 0);
+    if (partIndex !== undefined) {
+      console.log(`Processing part ${partIndex + 1} of ${totalParts}`);
+    }
 
     if (!apiKey || !text) {
       return res.status(400).json({ 
@@ -60,18 +63,23 @@ export default async function handler(req, res) {
       'informal': `Use um tom casual e descontraído.`
     };
 
-    const systemPrompt = `Você é um tradutor profissional. ${styleInstructions[style || 'intelligent']}
+    // Prompt melhorado para garantir tradução completa
+    const systemPrompt = `Você é um tradutor profissional altamente experiente. ${styleInstructions[style || 'intelligent']}
 
-INSTRUÇÕES CRÍTICAS - VOCÊ DEVE SEGUIR TODAS:
-1. Traduza o TEXTO COMPLETO, preservando TODO o conteúdo
-2. NUNCA resuma, condense ou pule partes
-3. Mantenha o mesmo nível de detalhe do original
-4. Se o original tem 50 parágrafos, a tradução deve ter ~50 parágrafos
-5. PROIBIDO criar versões resumidas
-6. Traduza TUDO: cada parágrafo, cada frase, cada detalhe
-7. A tradução deve ter extensão similar ao original
-8. NÃO adicione notas sobre tradução parcial
-9. Você DEVE traduzir até a última palavra do texto
+REGRAS ABSOLUTAS - VOCÊ DEVE SEGUIR TODAS SEM EXCEÇÃO:
+
+1. TRADUZA 100% DO TEXTO - Cada palavra, cada frase, cada parágrafo
+2. NUNCA resuma, condense, abrevie ou pule NENHUMA parte
+3. NUNCA use expressões como "[continua...]" ou "[resto do texto]"
+4. Se o texto original tem 50 linhas, a tradução deve ter ~50 linhas
+5. MANTENHA toda formatação: parágrafos, quebras de linha, listas
+6. PRESERVE todos os detalhes, exemplos, repetições - TUDO
+7. A tradução deve ter comprimento SIMILAR ao original
+8. NÃO adicione notas sobre o processo de tradução
+9. NÃO mencione que está traduzindo por partes
+10. APENAS traduza - sem comentários adicionais
+
+${partIndex !== undefined ? `ATENÇÃO: Este é o fragmento ${partIndex + 1} de ${totalParts} de um texto maior. Traduza COMPLETAMENTE este fragmento, mantendo a coerência.` : ''}
 
 Traduza o texto${sourceLang === 'auto' ? '' : ' do ' + languageNames[sourceLang]} para ${languageNames[targetLang]}.
 Retorne APENAS a tradução completa, sem comentários.`;
@@ -92,7 +100,7 @@ Retorne APENAS a tradução completa, sem comentários.`;
         system: systemPrompt,
         messages: [{
           role: 'user',
-          content: `Traduza COMPLETAMENTE o seguinte texto, sem pular nenhuma parte:\n\n${text}`
+          content: `IMPORTANTE: Traduza TODO o texto abaixo, do início ao fim, sem pular NADA:\n\n${text}`
         }]
       })
     });
@@ -102,8 +110,22 @@ Retorne APENAS a tradução completa, sem comentários.`;
 
     if (!response.ok) {
       console.error('Anthropic error:', data);
+      
+      // Mensagens de erro mais claras
+      let errorMessage = data.error?.message || 'Translation failed';
+      
+      if (response.status === 401) {
+        errorMessage = 'Chave API inválida. Verifique se copiou corretamente.';
+      } else if (response.status === 402) {
+        errorMessage = 'Créditos insuficientes na sua conta Anthropic.';
+      } else if (response.status === 429) {
+        errorMessage = 'Muitas requisições. Aguarde 1 minuto e tente novamente.';
+      } else if (response.status === 500) {
+        errorMessage = 'Erro no servidor da Anthropic. Tente novamente.';
+      }
+      
       return res.status(response.status).json({ 
-        error: data.error?.message || 'Translation failed',
+        error: errorMessage,
         anthropicError: data
       });
     }
@@ -114,10 +136,27 @@ Retorne APENAS a tradução completa, sem comentários.`;
       });
     }
 
-    console.log('Translation successful, response length:', data.content[0].text.length);
+    const translation = data.content[0].text;
+    console.log('Translation successful, response length:', translation.length);
+
+    // Verificar se a tradução parece completa
+    const originalLength = text.length;
+    const translationLength = translation.length;
+    const ratio = translationLength / originalLength;
+    
+    console.log(`Length ratio: ${ratio.toFixed(2)} (translation: ${translationLength}, original: ${originalLength})`);
+    
+    // Avisar se a tradução parece muito curta (menos de 50% do original)
+    if (ratio < 0.5 && originalLength > 1000) {
+      console.warn('Warning: Translation seems too short compared to original');
+    }
 
     res.status(200).json({ 
-      translation: data.content[0].text 
+      translation: translation,
+      originalLength: originalLength,
+      translationLength: translationLength,
+      partIndex: partIndex,
+      totalParts: totalParts
     });
 
   } catch (error) {
