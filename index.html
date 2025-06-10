@@ -287,6 +287,18 @@
             width: 0%;
         }
 
+        .progress-details {
+            text-align: center;
+            font-size: 14px;
+            color: #86868b;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .progress-details.show {
+            display: block;
+        }
+
         .error {
             background: #fff5f5;
             border: 1px solid #ff3b30;
@@ -595,6 +607,7 @@
         <div class="progress-bar" id="progressBar">
             <div class="progress-fill" id="progressFill"></div>
         </div>
+        <div class="progress-details" id="progressDetails"></div>
 
         <div class="error" id="error"></div>
         <div class="warning" id="warning"></div>
@@ -645,6 +658,7 @@
         let translatedText = '';
         let currentFileName = '';
         let translationStartTime = 0;
+        let abortController = null;
 
         // Atualizar contador de caracteres
         document.getElementById('textInput').addEventListener('input', updateCharCount);
@@ -657,18 +671,18 @@
             // Estimativa de tempo melhorada
             let timeEstimate = '';
             if (charCount > 0) {
-                if (charCount <= 5000) {
+                if (charCount <= 3000) {
                     timeEstimate = ' • ~10 segundos';
                 } else if (charCount <= 10000) {
-                    timeEstimate = ' • ~20 segundos';
-                } else if (charCount <= 20000) {
-                    timeEstimate = ' • ~40 segundos';
+                    timeEstimate = ' • ~1 minuto';
+                } else if (charCount <= 30000) {
+                    timeEstimate = ' • ~3 minutos';
                 } else if (charCount <= 50000) {
-                    timeEstimate = ' • ~2 minutos';
-                } else if (charCount <= 100000) {
                     timeEstimate = ' • ~5 minutos';
+                } else if (charCount <= 100000) {
+                    timeEstimate = ' • ~10 minutos';
                 } else {
-                    timeEstimate = ' • ~10+ minutos';
+                    timeEstimate = ' • ~20+ minutos';
                 }
             }
             
@@ -818,9 +832,8 @@
             updateCharCount();
         }
 
-        // Função melhorada para dividir texto
-        function smartSplitText(text, maxChunkSize = 4000) {
-            // Se o texto for pequeno, não precisa dividir
+        // Função aprimorada para dividir texto
+        function smartSplitText(text, maxChunkSize = 3000) {
             if (text.length <= maxChunkSize) {
                 return [text];
             }
@@ -830,15 +843,15 @@
             let currentChunk = '';
 
             for (const paragraph of paragraphs) {
-                // Se um único parágrafo for maior que o limite
+                // Se um parágrafo sozinho for maior que o limite
                 if (paragraph.length > maxChunkSize) {
-                    // Se temos algo no chunk atual, salva primeiro
+                    // Salva chunk atual se houver
                     if (currentChunk.trim()) {
                         chunks.push(currentChunk.trim());
                         currentChunk = '';
                     }
 
-                    // Divide o parágrafo grande por sentenças
+                    // Divide parágrafo grande por sentenças
                     const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
                     
                     for (const sentence of sentences) {
@@ -850,16 +863,13 @@
                         }
                     }
                 } else if (currentChunk.length + paragraph.length + 2 > maxChunkSize) {
-                    // Se adicionar este parágrafo ultrapassar o limite
                     chunks.push(currentChunk.trim());
                     currentChunk = paragraph;
                 } else {
-                    // Adiciona o parágrafo ao chunk atual
                     currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
                 }
             }
 
-            // Adiciona o último chunk se houver
             if (currentChunk.trim()) {
                 chunks.push(currentChunk.trim());
             }
@@ -897,22 +907,28 @@
             
             // Marcar início da tradução
             translationStartTime = Date.now();
+            abortController = new AbortController();
 
             try {
-                // Dividir texto em chunks se necessário
-                const chunks = smartSplitText(text, 4000); // Chunks menores para garantir tradução completa
+                const chunks = smartSplitText(text, 3000);
                 
                 if (chunks.length > 1) {
-                    showWarning(`Texto grande detectado! Dividindo em ${chunks.length} partes para garantir tradução completa.`);
+                    showWarning(`⚠️ Texto grande! Dividindo em ${chunks.length} partes para garantir tradução completa.`);
                     translatedText = await translateInChunks(apiKey, chunks, sourceLang, targetLang, style);
                 } else {
                     showLoading(true, 'Traduzindo...');
                     translatedText = await callAnthropicAPI(apiKey, text, sourceLang, targetLang, style);
                 }
                 
-                showResult(translatedText);
+                if (translatedText) {
+                    showResult(translatedText);
+                } else {
+                    throw new Error('Tradução retornou vazia');
+                }
             } catch (error) {
-                if (error.message.includes('402')) {
+                if (error.name === 'AbortError') {
+                    showError('Tradução cancelada');
+                } else if (error.message.includes('402')) {
                     showError('Erro 402: Créditos insuficientes na API. Verifique seu saldo em console.anthropic.com');
                 } else if (error.message.includes('401')) {
                     showError('Erro 401: Chave API inválida. Verifique se está correta.');
@@ -925,52 +941,82 @@
                 showLoading(false);
                 hideProgressBar();
                 document.getElementById('translateButton').disabled = false;
+                abortController = null;
             }
         }
 
         async function translateInChunks(apiKey, chunks, sourceLang, targetLang, style) {
             const translations = [];
+            const failedParts = [];
             showProgressBar();
             
             for (let i = 0; i < chunks.length; i++) {
-                const progress = ((i + 1) / chunks.length) * 100;
-                updateProgress(progress, `Traduzindo parte ${i + 1} de ${chunks.length}...`);
-                
-                try {
-                    const translation = await callAnthropicAPI(
-                        apiKey, 
-                        chunks[i], 
-                        sourceLang, 
-                        targetLang, 
-                        style,
-                        i,
-                        chunks.length
-                    );
-                    
-                    if (translation && translation.trim()) {
-                        translations.push(translation);
-                        console.log(`Parte ${i + 1} traduzida com sucesso: ${translation.length} caracteres`);
-                    } else {
-                        console.error(`Parte ${i + 1} retornou vazia!`);
-                        showWarning(`Atenção: Parte ${i + 1} pode ter sido pulada. Verifique o resultado.`);
-                    }
-                    
-                    // Pequena pausa entre requisições para evitar rate limit
-                    if (i < chunks.length - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-                } catch (error) {
-                    console.error(`Erro ao traduzir parte ${i + 1}:`, error);
-                    showWarning(`Erro na parte ${i + 1}. Tentando continuar...`);
+                if (abortController.signal.aborted) {
+                    throw new Error('Tradução cancelada');
                 }
+
+                const progress = ((i) / chunks.length) * 100;
+                updateProgress(progress, `Traduzindo parte ${i + 1} de ${chunks.length}...`);
+                updateProgressDetails(`Partes concluídas: ${i}/${chunks.length} | Falhas: ${failedParts.length}`);
+                
+                let retries = 3;
+                let translated = null;
+                
+                while (retries > 0 && !translated) {
+                    try {
+                        translated = await callAnthropicAPI(
+                            apiKey, 
+                            chunks[i], 
+                            sourceLang, 
+                            targetLang, 
+                            style,
+                            i,
+                            chunks.length
+                        );
+                        
+                        if (translated && translated.trim()) {
+                            translations.push(translated);
+                            console.log(`✓ Parte ${i + 1} traduzida: ${translated.length} caracteres`);
+                            break;
+                        } else {
+                            throw new Error('Tradução vazia');
+                        }
+                    } catch (error) {
+                        retries--;
+                        console.error(`✗ Erro na parte ${i + 1}, tentativas restantes: ${retries}`, error);
+                        
+                        if (retries > 0) {
+                            // Espera progressiva entre tentativas
+                            const waitTime = (3 - retries) * 2000; // 2s, 4s, 6s
+                            updateProgressDetails(`Erro na parte ${i + 1}. Aguardando ${waitTime/1000}s para tentar novamente...`);
+                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                        } else {
+                            failedParts.push(i + 1);
+                            translations.push(`[ERRO NA TRADUÇÃO DA PARTE ${i + 1}]`);
+                        }
+                    }
+                }
+                
+                // Delay entre partes bem-sucedidas
+                if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                }
+            }
+            
+            updateProgress(100, 'Tradução concluída!');
+            
+            if (failedParts.length > 0) {
+                showWarning(`⚠️ ATENÇÃO: ${failedParts.length} parte(s) falharam: ${failedParts.join(', ')}. Verifique o resultado.`);
             }
             
             if (translations.length === 0) {
                 throw new Error('Nenhuma parte foi traduzida com sucesso');
             }
             
-            if (translations.length < chunks.length) {
-                showWarning(`Atenção: Apenas ${translations.length} de ${chunks.length} partes foram traduzidas.`);
+            // Verifica integridade
+            const successRate = (translations.length - failedParts.length) / chunks.length;
+            if (successRate < 0.8) {
+                showWarning(`⚠️ Apenas ${Math.round(successRate * 100)}% do texto foi traduzido com sucesso.`);
             }
             
             return translations.join('\n\n');
@@ -991,18 +1037,26 @@
                         style,
                         partIndex,
                         totalParts
-                    })
+                    }),
+                    signal: abortController ? abortController.signal : undefined
                 });
 
                 const data = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(data.error || 'Erro na tradução');
+                    if (data.timeout) {
+                        throw new Error('Timeout - tente um texto menor');
+                    }
+                    throw new Error(data.error || `Erro ${response.status}`);
                 }
 
-                // Verificar se a tradução está completa
-                if (data.translationLength < data.originalLength * 0.5) {
-                    console.warn(`Tradução pode estar incompleta: Original ${data.originalLength} chars, Tradução ${data.translationLength} chars`);
+                if (!data.success || !data.translation) {
+                    throw new Error('Resposta inválida da API');
+                }
+
+                // Log para debug
+                if (partIndex !== undefined) {
+                    console.log(`Parte ${partIndex + 1}: Original ${data.originalLength} → Tradução ${data.translationLength} (${Math.round(data.translationLength/data.originalLength*100)}%)`);
                 }
 
                 return data.translation;
@@ -1014,24 +1068,20 @@
 
         function showResult(text) {
             if (!text || text.trim() === '') {
-                showError('Erro: A tradução retornou vazia. Tente novamente com um texto menor.');
+                showError('Erro: A tradução retornou vazia.');
                 return;
             }
             
-            // Limpar marcações do Claude
+            // Limpar marcações
             const cleanText = text
-                .replace(/\[CONTINUA\.\.\.?\]/gi, '')
-                .replace(/\[.*?continua.*?\]/gi, '')
-                .replace(/\[.*?traduzindo.*?\]/gi, '')
-                .replace(/\[.*?fragmento.*?\]/gi, '')
-                .replace(/Nota:.*?$/gm, '')
+                .replace(/\[ERRO NA TRADUÇÃO DA PARTE \d+\]/g, match => `\n\n${match}\n\n`)
                 .trim();
             
             document.getElementById('resultText').textContent = cleanText;
             translatedText = cleanText;
             document.getElementById('resultSection').classList.add('show');
             
-            // Calcular tempo e estatísticas
+            // Estatísticas
             const translationTime = Math.round((Date.now() - translationStartTime) / 1000);
             const originalLength = document.getElementById('textInput').value.length;
             const translatedLength = cleanText.length;
@@ -1042,7 +1092,12 @@
                 `Tradução: ${translatedLength.toLocaleString('pt-BR')} chars (${ratio}%) | ` +
                 `Tempo: ${translationTime}s`;
             
-            // Scroll suave
+            // Verificar se parece completo
+            if (ratio < 70) {
+                showWarning('⚠️ A tradução parece estar incompleta (menos de 70% do tamanho original).');
+            }
+            
+            // Scroll
             setTimeout(() => {
                 document.getElementById('resultSection').scrollIntoView({ 
                     behavior: 'smooth', 
@@ -1056,6 +1111,12 @@
             document.getElementById('progressText').textContent = message;
         }
 
+        function updateProgressDetails(details) {
+            const detailsEl = document.getElementById('progressDetails');
+            detailsEl.textContent = details;
+            detailsEl.classList.add('show');
+        }
+
         function showProgressBar() {
             document.getElementById('progressBar').classList.add('show');
             document.getElementById('progressFill').style.width = '0%';
@@ -1063,6 +1124,7 @@
 
         function hideProgressBar() {
             document.getElementById('progressBar').classList.remove('show');
+            document.getElementById('progressDetails').classList.remove('show');
         }
 
         function showWarning(message) {
@@ -1163,6 +1225,14 @@
         .metadata p {
             margin: 5px 0;
         }
+        .error-marker {
+            background: #ffeeee;
+            color: #cc0000;
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -1233,6 +1303,11 @@ ${markdownContent}`;
                 .replace(/</g, '&lt;')
                 .replace(/>/g, '&gt;');
 
+            // Marcar erros de tradução
+            html = html.replace(/\[ERRO NA TRADUÇÃO DA PARTE \d+\]/g, match => 
+                `<div class="error-marker">${match}</div>`
+            );
+
             html = html
                 .replace(/^([A-Z][A-Z\s]+)$/gm, '<h2>$1</h2>')
                 .replace(/^(.+)\n[=]+$/gm, '<h1>$1</h1>')
@@ -1241,7 +1316,7 @@ ${markdownContent}`;
                 .split(/\n\n+/)
                 .map(para => {
                     para = para.trim();
-                    if (para.startsWith('<h') || para === '') return para;
+                    if (para.startsWith('<') || para === '') return para;
                     
                     if (para.match(/^[-*•]\s+/m)) {
                         const items = para.split(/\n/).map(line => 
@@ -1276,6 +1351,11 @@ ${markdownContent}`;
 
         function convertToMarkdown(text) {
             let markdown = text;
+
+            // Marcar erros
+            markdown = markdown.replace(/\[ERRO NA TRADUÇÃO DA PARTE \d+\]/g, match => 
+                `\n\n> ⚠️ **${match}**\n\n`
+            );
 
             markdown = markdown
                 .replace(/^([A-Z][A-Z\s]+)$/gm, '## $1')
@@ -1317,29 +1397,7 @@ ${markdownContent}`;
             if (show) {
                 document.getElementById('loadingText').textContent = message;
                 loadingEl.classList.add('show');
-                
-                let seconds = 0;
-                const progressInterval = setInterval(() => {
-                    seconds += 5;
-                    const progressEl = document.getElementById('progressText');
-                    if (seconds < 30) {
-                        progressEl.textContent = 'Processando texto...';
-                    } else if (seconds < 60) {
-                        progressEl.textContent = 'Isto pode levar alguns momentos...';
-                    } else {
-                        progressEl.textContent = 'Texto longo - aguarde mais um pouco...';
-                    }
-                    
-                    if (!loadingEl.classList.contains('show')) {
-                        clearInterval(progressInterval);
-                    }
-                }, 5000);
-                
-                loadingEl.progressInterval = progressInterval;
             } else {
-                if (loadingEl.progressInterval) {
-                    clearInterval(loadingEl.progressInterval);
-                }
                 loadingEl.classList.remove('show');
                 document.getElementById('progressText').textContent = '';
             }
@@ -1351,10 +1409,6 @@ ${markdownContent}`;
             errorEl.classList.add('show');
             
             errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            
-            setTimeout(() => {
-                errorEl.classList.remove('show');
-            }, 10000);
         }
 
         function hideError() {
@@ -1369,6 +1423,14 @@ ${markdownContent}`;
         // Salvar preferência de estilo
         document.getElementById('style').addEventListener('change', (e) => {
             localStorage.setItem('translation_style', e.target.value);
+        });
+
+        // Cancelar tradução com ESC
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && abortController) {
+                abortController.abort();
+                showWarning('Tradução cancelada pelo usuário');
+            }
         });
 
         window.addEventListener('load', () => {
