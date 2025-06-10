@@ -63,106 +63,128 @@ export default async function handler(req, res) {
       'informal': `Use um tom casual e descontraído.`
     };
 
-    // Prompt melhorado para garantir tradução completa
-    const systemPrompt = `Você é um tradutor profissional altamente experiente. ${styleInstructions[style || 'intelligent']}
+    // Prompt ainda mais rigoroso para garantir tradução completa
+    const systemPrompt = `Você é um tradutor profissional altamente qualificado. ${styleInstructions[style || 'intelligent']}
 
-REGRAS ABSOLUTAS - VOCÊ DEVE SEGUIR TODAS SEM EXCEÇÃO:
+INSTRUÇÕES CRÍTICAS - VOCÊ DEVE SEGUIR TODAS:
 
-1. TRADUZA 100% DO TEXTO - Cada palavra, cada frase, cada parágrafo
-2. NUNCA resuma, condense, abrevie ou pule NENHUMA parte
-3. NUNCA use expressões como "[continua...]" ou "[resto do texto]"
-4. Se o texto original tem 50 linhas, a tradução deve ter ~50 linhas
-5. MANTENHA toda formatação: parágrafos, quebras de linha, listas
-6. PRESERVE todos os detalhes, exemplos, repetições - TUDO
-7. A tradução deve ter comprimento SIMILAR ao original
-8. NÃO adicione notas sobre o processo de tradução
-9. NÃO mencione que está traduzindo por partes
-10. APENAS traduza - sem comentários adicionais
+1. TRADUZA 100% DO TEXTO FORNECIDO
+2. NUNCA RESUMA, NUNCA PULE NADA
+3. CADA PALAVRA DEVE SER TRADUZIDA
+4. SE O TEXTO TEM 1000 PALAVRAS, A TRADUÇÃO DEVE TER ~1000 PALAVRAS
+5. MANTENHA TODOS OS DETALHES
+6. PRESERVE TODA A FORMATAÇÃO
+7. NÃO ADICIONE COMENTÁRIOS SOBRE A TRADUÇÃO
+8. APENAS TRADUZA, NADA MAIS
 
-${partIndex !== undefined ? `ATENÇÃO: Este é o fragmento ${partIndex + 1} de ${totalParts} de um texto maior. Traduza COMPLETAMENTE este fragmento, mantendo a coerência.` : ''}
+${partIndex !== undefined ? `ESTE É O FRAGMENTO ${partIndex + 1} DE ${totalParts}. TRADUZA TODO ESTE FRAGMENTO.` : ''}
 
-Traduza o texto${sourceLang === 'auto' ? '' : ' do ' + languageNames[sourceLang]} para ${languageNames[targetLang]}.
-Retorne APENAS a tradução completa, sem comentários.`;
+Idioma de origem: ${sourceLang === 'auto' ? 'detectar automaticamente' : languageNames[sourceLang]}
+Idioma de destino: ${languageNames[targetLang]}
+
+RETORNE APENAS A TRADUÇÃO COMPLETA.`;
 
     console.log('Making request to Anthropic...');
+    console.log('Fragment size:', text.length, 'characters');
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 8192,
-        temperature: style === 'creative' ? 0.7 : 0.3,
-        system: systemPrompt,
-        messages: [{
-          role: 'user',
-          content: `IMPORTANTE: Traduza TODO o texto abaixo, do início ao fim, sem pular NADA:\n\n${text}`
-        }]
-      })
-    });
+    // Timeout de 9 segundos (deixando 1s de margem para o Vercel)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 9000);
 
-    console.log('Anthropic response status:', response.status);
-    const data = await response.json();
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 8192,
+          temperature: style === 'creative' ? 0.7 : 0.3,
+          system: systemPrompt,
+          messages: [{
+            role: 'user',
+            content: `Traduza TODO o texto abaixo. NÃO PULE NADA. TRADUZA CADA PALAVRA:\n\n${text}`
+          }]
+        }),
+        signal: controller.signal
+      });
 
-    if (!response.ok) {
-      console.error('Anthropic error:', data);
+      clearTimeout(timeoutId);
+
+      console.log('Anthropic response status:', response.status);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error('Anthropic error:', data);
+        
+        let errorMessage = data.error?.message || 'Translation failed';
+        
+        if (response.status === 401) {
+          errorMessage = 'Chave API inválida';
+        } else if (response.status === 402) {
+          errorMessage = 'Créditos insuficientes';
+        } else if (response.status === 429) {
+          errorMessage = 'Rate limit - aguarde antes de continuar';
+        } else if (response.status === 500) {
+          errorMessage = 'Erro no servidor da Anthropic';
+        }
+        
+        return res.status(response.status).json({ 
+          error: errorMessage,
+          status: response.status
+        });
+      }
+
+      if (!data.content || !data.content[0] || !data.content[0].text) {
+        return res.status(500).json({ 
+          error: 'Invalid response from API' 
+        });
+      }
+
+      const translation = data.content[0].text;
+      console.log('Translation successful, response length:', translation.length);
+
+      // Log detalhado para debug
+      const ratio = translation.length / text.length;
+      console.log(`Length ratio: ${ratio.toFixed(2)}`);
+      console.log(`Original: ${text.length} chars`);
+      console.log(`Translation: ${translation.length} chars`);
       
-      // Mensagens de erro mais claras
-      let errorMessage = data.error?.message || 'Translation failed';
+      if (ratio < 0.5 && text.length > 500) {
+        console.warn('WARNING: Translation seems too short!');
+      }
+
+      res.status(200).json({ 
+        translation: translation,
+        originalLength: text.length,
+        translationLength: translation.length,
+        partIndex: partIndex,
+        totalParts: totalParts,
+        success: true
+      });
+
+    } catch (error) {
+      clearTimeout(timeoutId);
       
-      if (response.status === 401) {
-        errorMessage = 'Chave API inválida. Verifique se copiou corretamente.';
-      } else if (response.status === 402) {
-        errorMessage = 'Créditos insuficientes na sua conta Anthropic.';
-      } else if (response.status === 429) {
-        errorMessage = 'Muitas requisições. Aguarde 1 minuto e tente novamente.';
-      } else if (response.status === 500) {
-        errorMessage = 'Erro no servidor da Anthropic. Tente novamente.';
+      if (error.name === 'AbortError') {
+        console.error('Request timeout after 9 seconds');
+        return res.status(504).json({ 
+          error: 'Timeout - o texto é muito grande para o tempo limite',
+          timeout: true
+        });
       }
       
-      return res.status(response.status).json({ 
-        error: errorMessage,
-        anthropicError: data
-      });
+      throw error;
     }
-
-    if (!data.content || !data.content[0] || !data.content[0].text) {
-      return res.status(500).json({ 
-        error: 'Invalid response from translation API' 
-      });
-    }
-
-    const translation = data.content[0].text;
-    console.log('Translation successful, response length:', translation.length);
-
-    // Verificar se a tradução parece completa
-    const originalLength = text.length;
-    const translationLength = translation.length;
-    const ratio = translationLength / originalLength;
-    
-    console.log(`Length ratio: ${ratio.toFixed(2)} (translation: ${translationLength}, original: ${originalLength})`);
-    
-    // Avisar se a tradução parece muito curta (menos de 50% do original)
-    if (ratio < 0.5 && originalLength > 1000) {
-      console.warn('Warning: Translation seems too short compared to original');
-    }
-
-    res.status(200).json({ 
-      translation: translation,
-      originalLength: originalLength,
-      translationLength: translationLength,
-      partIndex: partIndex,
-      totalParts: totalParts
-    });
 
   } catch (error) {
     console.error('Server error:', error);
     res.status(500).json({ 
-      error: 'Internal server error: ' + error.message 
+      error: 'Internal server error',
+      message: error.message 
     });
   }
 }
