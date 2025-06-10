@@ -345,6 +345,13 @@
             line-height: 1.6;
         }
 
+        .result-info {
+            text-align: right;
+            font-size: 14px;
+            color: #86868b;
+            margin-top: 8px;
+        }
+
         footer {
             text-align: center;
             margin-top: 48px;
@@ -499,6 +506,7 @@
                 </div>
             </div>
             <div class="result-text" id="resultText"></div>
+            <div class="result-info" id="resultInfo"></div>
         </div>
 
         <footer>
@@ -513,6 +521,7 @@
         let extractedText = '';
         let translatedText = '';
         let currentFileName = '';
+        let translationStartTime = 0;
 
         // Atualizar contador de caracteres
         document.getElementById('textInput').addEventListener('input', updateCharCount);
@@ -716,6 +725,9 @@
             hideError();
             document.getElementById('translateButton').disabled = true;
             document.getElementById('resultSection').classList.remove('show');
+            
+            // Marcar início da tradução
+            translationStartTime = Date.now();
 
             // Adicionar timeout para evitar travamentos
             const timeoutId = setTimeout(() => {
@@ -840,7 +852,16 @@
                 .trim();
             
             document.getElementById('resultText').textContent = cleanText;
+            translatedText = cleanText; // Salvar texto limpo
             document.getElementById('resultSection').classList.add('show');
+            
+            // Calcular tempo de tradução
+            const translationTime = Math.round((Date.now() - translationStartTime) / 1000);
+            
+            // Mostrar informações
+            const charCount = cleanText.length;
+            document.getElementById('resultInfo').innerHTML = 
+                `${charCount.toLocaleString('pt-BR')} caracteres traduzidos • ${translationTime} segundos`;
             
             // Scroll suave até o resultado
             setTimeout(() => {
