@@ -1,88 +1,997 @@
-export default async function handler(req, res) {
-  console.log('=== REQUEST RECEIVED ===');
-  console.log('Method:', req.method);
-  console.log('Headers:', req.headers);
-  console.log('Body:', JSON.stringify(req.body));
-  
-  // Configurar CORS
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-  );
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  try {
-    const { text, sourceLang, targetLang, style, apiKey } = req.body;
-
-    console.log('Extracted values:', {
-      hasApiKey: !!apiKey,
-      apiKeyLength: apiKey?.length,
-      firstChars: apiKey?.substring(0, 20) + '...',
-      hasText: !!text,
-      textLength: text?.length
-    });
-
-    if (!apiKey || !text) {
-      return res.status(400).json({ 
-        error: 'Missing required fields',
-        details: {
-          hasApiKey: !!apiKey,
-          hasText: !!text
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tradutor de Documentos</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-      });
-    }
 
-    console.log('Making request to Anthropic...');
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f5f7;
+            color: #1d1d1f;
+            line-height: 1.5;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 4096,
-        temperature: 0.3,
-        system: `Traduza o texto para ${targetLang === 'pt-BR' ? 'português brasileiro' : targetLang === 'en' ? 'inglês' : targetLang}. Retorne apenas a tradução.`,
-        messages: [{
-          role: 'user',
-          content: text
-        }]
-      })
-    });
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            padding: 48px;
+        }
 
-    console.log('Anthropic response status:', response.status);
-    const data = await response.json();
-    console.log('Anthropic response:', JSON.stringify(data).substring(0, 200));
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            text-align: center;
+            margin-bottom: 48px;
+            color: #1d1d1f;
+        }
 
-    if (!response.ok) {
-      return res.status(response.status).json({ 
-        error: data.error?.message || 'Translation failed',
-        anthropicError: data
-      });
-    }
+        .form-group {
+            margin-bottom: 24px;
+        }
 
-    res.status(200).json({ 
-      translation: data.content[0].text 
-    });
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: #1d1d1f;
+        }
 
-  } catch (error) {
-    console.error('Server error:', error);
-    res.status(500).json({ 
-      error: 'Internal server error: ' + error.message 
-    });
-  }
-}
+        input[type="password"] {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            background: #f5f5f7;
+            transition: all 0.2s;
+        }
+
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #0071e3;
+            background: white;
+        }
+
+        .language-selector {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 16px;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            font-size: 16px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 20px;
+            padding-right: 40px;
+        }
+
+        .help-text {
+            font-size: 14px;
+            color: #86868b;
+            margin-top: 8px;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #0071e3;
+        }
+
+        .arrow {
+            font-size: 20px;
+            color: #86868b;
+            text-align: center;
+        }
+
+        .upload-area {
+            border: 2px dashed #d2d2d7;
+            border-radius: 8px;
+            padding: 32px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 24px;
+            background: #f5f5f7;
+        }
+
+        .upload-area:hover {
+            border-color: #86868b;
+            background: #ebebed;
+        }
+
+        .upload-area.dragover {
+            border-color: #0071e3;
+            background: #e8f2ff;
+        }
+
+        .upload-icon {
+            font-size: 40px;
+            margin-bottom: 8px;
+            color: #86868b;
+        }
+
+        .upload-text {
+            color: #1d1d1f;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .upload-formats {
+            color: #86868b;
+            font-size: 14px;
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            background: #f5f5f7;
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 24px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .file-name {
+            color: #1d1d1f;
+            font-weight: 500;
+        }
+
+        .remove-file {
+            background: none;
+            border: none;
+            color: #0071e3;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .remove-file:hover {
+            background: #e8f2ff;
+        }
+
+        textarea {
+            width: 100%;
+            min-height: 200px;
+            padding: 16px;
+            font-size: 16px;
+            font-family: inherit;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            background: #f5f5f7;
+            resize: vertical;
+            transition: all 0.2s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #0071e3;
+            background: white;
+        }
+
+        .char-count {
+            text-align: right;
+            font-size: 14px;
+            color: #86868b;
+            margin-top: 8px;
+            margin-bottom: 32px;
+        }
+
+        .button {
+            width: 100%;
+            padding: 16px 32px;
+            font-size: 17px;
+            font-weight: 500;
+            color: white;
+            background: #0071e3;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 32px;
+        }
+
+        .button:hover:not(:disabled) {
+            background: #0077ed;
+        }
+
+        .button:disabled {
+            background: #86868b;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 32px;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .loading p {
+            margin: 10px 0;
+            color: #495057;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f5f5f7;
+            border-top-color: #0071e3;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #fff5f5;
+            border: 1px solid #ff3b30;
+            color: #ff3b30;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .result-section {
+            display: none;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .result-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d1d1f;
+        }
+
+        .result-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .small-button {
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .copy-button {
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+
+        .copy-button:hover {
+            background: #e8e8ed;
+        }
+
+        .download-button {
+            background: #0071e3;
+            color: white;
+        }
+
+        .download-button:hover {
+            background: #0077ed;
+        }
+
+        .result-text {
+            background: #f5f5f7;
+            border-radius: 8px;
+            padding: 24px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+
+        .result-info {
+            text-align: right;
+            font-size: 14px;
+            color: #86868b;
+            margin-top: 8px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 48px;
+            padding-top: 24px;
+            border-top: 1px solid #d2d2d7;
+            color: #86868b;
+            font-size: 14px;
+        }
+
+        footer a {
+            color: #0071e3;
+            text-decoration: none;
+        }
+
+        footer a:hover {
+            text-decoration: underline;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 32px 24px;
+            }
+
+            h1 {
+                font-size: 28px;
+                margin-bottom: 32px;
+            }
+
+            .language-selector {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+
+            .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Tradutor de Documentos</h1>
+
+        <div class="form-group">
+            <label for="apiKey">Chave API Anthropic</label>
+            <input 
+                type="password" 
+                id="apiKey" 
+                placeholder="sk-ant-api03-..." 
+                autocomplete="off"
+            >
+        </div>
+
+        <div class="language-selector">
+            <div>
+                <label for="sourceLang">Idioma de origem</label>
+                <select id="sourceLang">
+                    <option value="auto">Detectar automaticamente</option>
+                    <option value="pt-BR">Português (Brasil)</option>
+                    <option value="pt-PT">Português (Portugal)</option>
+                    <option value="en">Inglês</option>
+                    <option value="es">Espanhol</option>
+                    <option value="fr">Francês</option>
+                    <option value="de">Alemão</option>
+                    <option value="it">Italiano</option>
+                    <option value="ja">Japonês</option>
+                    <option value="ko">Coreano</option>
+                    <option value="zh">Chinês</option>
+                </select>
+            </div>
+            <div class="arrow">→</div>
+            <div>
+                <label for="targetLang">Idioma de destino</label>
+                <select id="targetLang">
+                    <option value="pt-BR">Português (Brasil)</option>
+                    <option value="pt-PT">Português (Portugal)</option>
+                    <option value="en" selected>Inglês</option>
+                    <option value="es">Espanhol</option>
+                    <option value="fr">Francês</option>
+                    <option value="de">Alemão</option>
+                    <option value="it">Italiano</option>
+                    <option value="ja">Japonês</option>
+                    <option value="ko">Coreano</option>
+                    <option value="zh">Chinês</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label for="style">Estilo de tradução</label>
+            <select id="style">
+                <option value="intelligent" selected>Inteligente (Recomendada)</option>
+                <option value="faithful">Fiel ao Original</option>
+                <option value="fluent">Fluente e Natural</option>
+                <option value="creative">Criativa e Literária</option>
+                <option value="simplified">Simplificada</option>
+                <option value="formal">Formal e Profissional</option>
+                <option value="informal">Informal e Casual</option>
+            </select>
+            <p class="help-text" style="font-size: 14px; color: #86868b; margin-top: 8px;">
+                💡 Inteligente: Captura TODOS os significados e transpõe perfeitamente estilo, contexto e expressões
+            </p>
+        </div>
+
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📄</div>
+            <p class="upload-text">Arraste um arquivo ou clique para selecionar</p>
+            <p class="upload-formats">PDF, TXT, DOCX • Máximo 50MB</p>
+            <input type="file" id="fileInput" accept=".pdf,.txt,.docx,.doc">
+        </div>
+
+        <div class="file-info" id="fileInfo">
+            <span class="file-name" id="fileName"></span>
+            <button class="remove-file" id="removeFileBtn">Remover</button>
+        </div>
+
+        <div class="form-group">
+            <label for="textInput">Ou insira seu texto aqui</label>
+            <textarea 
+                id="textInput" 
+                placeholder="Cole ou digite o texto que deseja traduzir..."
+            ></textarea>
+            <div class="char-count">
+                <span id="charCount">0</span> caracteres
+            </div>
+        </div>
+
+        <button class="button" id="translateButton">
+            Traduzir
+        </button>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p id="loadingText">Traduzindo...</p>
+            <p style="font-size: 14px; color: #86868b;">
+                <span id="progressText"></span>
+            </p>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="result-section" id="resultSection">
+            <div class="result-header">
+                <h3 class="result-title">Tradução</h3>
+                <div class="result-actions">
+                    <button class="small-button copy-button" id="copyBtn">
+                        Copiar
+                    </button>
+                    <button class="small-button download-button" id="downloadBtn">
+                        Baixar
+                    </button>
+                </div>
+            </div>
+            <div class="result-text" id="resultText"></div>
+            <div class="result-info" id="resultInfo"></div>
+        </div>
+
+        <footer>
+            Powered by <a href="https://www.anthropic.com" target="_blank">Anthropic Claude</a>
+        </footer>
+    </div>
+
+    <script>
+        // Configuração do PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let extractedText = '';
+        let translatedText = '';
+        let currentFileName = '';
+        let translationStartTime = 0;
+
+        // Atualizar contador de caracteres
+        document.getElementById('textInput').addEventListener('input', updateCharCount);
+
+        function updateCharCount() {
+            const text = document.getElementById('textInput').value;
+            const charCount = text.length;
+            document.getElementById('charCount').textContent = charCount.toLocaleString('pt-BR');
+            
+            // Estimativa de tempo
+            let timeEstimate = '';
+            if (charCount > 0) {
+                if (charCount <= 10000) {
+                    timeEstimate = ' • ~5 segundos';
+                } else if (charCount <= 50000) {
+                    timeEstimate = ' • ~30 segundos';
+                } else if (charCount <= 100000) {
+                    timeEstimate = ' • ~1 minuto';
+                } else if (charCount <= 200000) {
+                    timeEstimate = ' • ~2-3 minutos';
+                } else {
+                    timeEstimate = ' • ~5+ minutos';
+                }
+            }
+            
+            document.querySelector('.char-count').innerHTML = 
+                `<span id="charCount">${charCount.toLocaleString('pt-BR')}</span> caracteres${timeEstimate}`;
+        }
+
+        // Configurar eventos dos botões
+        document.getElementById('translateButton').addEventListener('click', translate);
+        document.getElementById('removeFileBtn').addEventListener('click', removeFile);
+        document.getElementById('copyBtn').addEventListener('click', copyResult);
+        document.getElementById('downloadBtn').addEventListener('click', downloadResult);
+
+        // Configurar eventos de upload
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+
+        uploadArea.addEventListener('click', () => fileInput.click());
+
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        async function handleFile(file) {
+            // Validar tamanho do arquivo
+            if (file.size > 50 * 1024 * 1024) {
+                showError('Arquivo muito grande. O limite é 50MB.');
+                return;
+            }
+
+            // Validar tipo de arquivo
+            const validTypes = ['application/pdf', 'text/plain', 
+                               'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                               'application/msword'];
+            
+            if (!validTypes.includes(file.type) && !file.name.endsWith('.txt')) {
+                showError('Tipo de arquivo não suportado. Use PDF, TXT ou DOCX.');
+                return;
+            }
+
+            currentFileName = file.name;
+            showFileInfo(file.name);
+
+            try {
+                showLoading(true, 'Processando arquivo...');
+                
+                if (file.type === 'application/pdf') {
+                    extractedText = await extractPDF(file);
+                } else if (file.type === 'text/plain' || file.name.endsWith('.txt')) {
+                    extractedText = await extractTXT(file);
+                } else if (file.type.includes('word') || file.name.endsWith('.docx')) {
+                    extractedText = await extractDOCX(file);
+                }
+
+                document.getElementById('textInput').value = extractedText;
+                updateCharCount();
+                showLoading(false);
+            } catch (error) {
+                showError('Erro ao processar arquivo: ' + error.message);
+                removeFile();
+                showLoading(false);
+            }
+        }
+
+        async function extractPDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+            let fullText = '';
+
+            for (let i = 1; i <= pdf.numPages; i++) {
+                showLoading(true, `Processando página ${i} de ${pdf.numPages}...`);
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                
+                // Melhor preservação de formatação
+                let lastY = null;
+                let pageText = '';
+                
+                textContent.items.forEach(item => {
+                    if (lastY !== null && Math.abs(lastY - item.transform[5]) > 5) {
+                        pageText += '\n';
+                    }
+                    pageText += item.str + ' ';
+                    lastY = item.transform[5];
+                });
+                
+                fullText += pageText + '\n\n';
+            }
+
+            return fullText.trim();
+        }
+
+        async function extractTXT(file) {
+            return await file.text();
+        }
+
+        async function extractDOCX(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const result = await mammoth.extractRawText({ arrayBuffer });
+            return result.value;
+        }
+
+        function showFileInfo(fileName) {
+            document.getElementById('fileName').textContent = fileName;
+            document.getElementById('fileInfo').style.display = 'flex';
+            document.getElementById('uploadArea').style.display = 'none';
+        }
+
+        function removeFile() {
+            extractedText = '';
+            currentFileName = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('uploadArea').style.display = 'block';
+            document.getElementById('textInput').value = '';
+            fileInput.value = '';
+            updateCharCount();
+        }
+
+        async function translate() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            const text = document.getElementById('textInput').value.trim();
+            const sourceLang = document.getElementById('sourceLang').value;
+            const targetLang = document.getElementById('targetLang').value;
+            const style = document.getElementById('style').value;
+
+            console.log('API Key length:', apiKey.length); // DEBUG
+            console.log('First 10 chars:', apiKey.substring(0, 10)); // DEBUG
+
+            if (!apiKey) {
+                showError('Por favor, insira sua chave API da Anthropic.');
+                return;
+            }
+
+            if (!text) {
+                showError('Por favor, insira um texto ou faça upload de um arquivo.');
+                return;
+            }
+
+            if (sourceLang === targetLang && sourceLang !== 'auto') {
+                showError('Os idiomas de origem e destino são iguais.');
+                return;
+            }
+
+            // Verificar tamanho do texto
+            if (text.length > 100000) {
+                if (!confirm('⚠️ Texto muito longo (' + Math.round(text.length/1000) + 'k caracteres)\n\nA tradução pode demorar 2-5 minutos.\n\nDeseja continuar?')) {
+                    return;
+                }
+            } else if (text.length > 50000) {
+                if (!confirm('Texto longo (' + Math.round(text.length/1000) + 'k caracteres)\n\nA tradução pode demorar 1-2 minutos.\n\nDeseja continuar?')) {
+                    return;
+                }
+            }
+
+            // Ajustar limite para forçar divisão em textos menores
+            const chunkSize = 10000; // Reduzido de 50000 para 10000
+
+            hideError();
+            document.getElementById('translateButton').disabled = true;
+            document.getElementById('resultSection').classList.remove('show');
+            
+            // Marcar início da tradução
+            translationStartTime = Date.now();
+
+            // Adicionar timeout para evitar travamentos
+            const timeoutId = setTimeout(() => {
+                showError('A tradução está demorando muito. Tente um texto menor ou verifique sua conexão.');
+                showLoading(false);
+                document.getElementById('translateButton').disabled = false;
+            }, 1200000); // 20 minutos de timeout!
+
+            try {
+                // Mostrar o estilo selecionado no loading
+                const styleNames = {
+                    'intelligent': 'Inteligente',
+                    'faithful': 'Fiel',
+                    'fluent': 'Fluente',
+                    'creative': 'Criativa',
+                    'simplified': 'Simplificada',
+                    'formal': 'Formal',
+                    'informal': 'Informal'
+                };
+                const loadingMessage = `Traduzindo (Estilo: ${styleNames[style]})...`;
+                
+                // Para textos muito grandes, dividir em chunks
+                if (text.length > chunkSize) {
+                    translatedText = await translateLargeText(apiKey, text, sourceLang, targetLang, style);
+                } else {
+                    showLoading(true, loadingMessage);
+                    translatedText = await callAnthropicAPI(apiKey, text, sourceLang, targetLang, style);
+                }
+                
+                showResult(translatedText);
+                clearTimeout(timeoutId); // Limpar timeout se sucesso
+            } catch (error) {
+                clearTimeout(timeoutId); // Limpar timeout se erro
+                if (error.message.includes('402')) {
+                    showError('Erro 402: Créditos insuficientes na API. Verifique seu saldo em console.anthropic.com');
+                } else if (error.message.includes('401')) {
+                    showError('Erro 401: Chave API inválida. Verifique se está correta.');
+                } else if (error.message.includes('429')) {
+                    showError('Erro 429: Muitas requisições. Aguarde um momento e tente novamente.');
+                } else {
+                    showError('Erro na tradução: ' + error.message);
+                }
+            } finally {
+                showLoading(false);
+                document.getElementById('translateButton').disabled = false;
+            }
+        }
+
+        async function translateLargeText(apiKey, text, sourceLang, targetLang, style) {
+            // Dividir texto preservando parágrafos
+            const chunks = [];
+            const paragraphs = text.split(/\n\n+/);
+            let currentChunk = '';
+            
+            for (const paragraph of paragraphs) {
+                if ((currentChunk + paragraph).length > 10000) { // Reduzido de 30000
+                    chunks.push(currentChunk);
+                    currentChunk = paragraph;
+                } else {
+                    currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+                }
+            }
+            if (currentChunk) chunks.push(currentChunk);
+            
+            // Traduzir cada chunk
+            const translations = [];
+            for (let i = 0; i < chunks.length; i++) {
+                showLoading(true, `Traduzindo parte ${i + 1} de ${chunks.length}...`);
+                try {
+                    const translated = await callAnthropicAPI(apiKey, chunks[i], sourceLang, targetLang, style);
+                    if (translated && translated.trim()) {
+                        translations.push(translated);
+                    }
+                } catch (err) {
+                    console.error(`Erro na parte ${i + 1}:`, err);
+                    // Continua com as outras partes mesmo se uma falhar
+                }
+            }
+            
+            return translations.join('\n\n');
+        }
+
+        async function callAnthropicAPI(apiKey, text, sourceLang, targetLang, style) {
+            try {
+                console.log('Sending to API:', {
+                    apiKeyLength: apiKey.length,
+                    textLength: text.length,
+                    sourceLang,
+                    targetLang,
+                    style
+                });
+
+                const response = await fetch('/api/translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        apiKey,
+                        text,
+                        sourceLang,
+                        targetLang,
+                        style
+                    })
+                });
+
+                console.log('Response status:', response.status);
+                const data = await response.json();
+                console.log('Response data:', data);
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Erro na tradução');
+                }
+
+                return data.translation;
+            } catch (error) {
+                console.error('Erro na API:', error);
+                throw error;
+            }
+        }
+
+        function showResult(text) {
+            // Remover notas automáticas do Claude sobre tradução parcial
+            const cleanText = text
+                .replace(/\[CONTINUA\.\.\.?\]/gi, '')
+                .replace(/\n?Nota: Devido ao limite.*/gs, '')
+                .replace(/\n?\[Nota: Esta é uma tradução parcial.*/gs, '')
+                .replace(/\n?Nota: Esta é apenas.*/gs, '')
+                .replace(/\[Continua traduzindo.*?\]/g, '')
+                .replace(/\[Continuação da tradução.*?\]/g, '')
+                .replace(/\[Texto traduzido.*?\]/g, '')
+                .replace(/\[.*?seguindo o mesmo padrão.*?\]/g, '')
+                .replace(/\n\n+/g, '\n\n') // Limpar quebras de linha extras
+                .trim();
+            
+            document.getElementById('resultText').textContent = cleanText;
+            translatedText = cleanText; // Salvar texto limpo
+            document.getElementById('resultSection').classList.add('show');
+            
+            // Calcular tempo de tradução
+            const translationTime = Math.round((Date.now() - translationStartTime) / 1000);
+            
+            // Mostrar informações
+            const charCount = cleanText.length;
+            document.getElementById('resultInfo').innerHTML = 
+                `${charCount.toLocaleString('pt-BR')} caracteres traduzidos • ${translationTime} segundos`;
+            
+            // Scroll suave até o resultado
+            setTimeout(() => {
+                document.getElementById('resultSection').scrollIntoView({ 
+                    behavior: 'smooth', 
+                    block: 'nearest' 
+                });
+            }, 100);
+        }
+
+        function copyResult() {
+            navigator.clipboard.writeText(translatedText).then(() => {
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copiado!';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                }, 2000);
+            }).catch(() => {
+                showError('Erro ao copiar. Tente selecionar e copiar manualmente.');
+            });
+        }
+
+        function downloadResult() {
+            // Criar documento formatado
+            const content = translatedText;
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            let fileName = 'traducao.txt';
+            if (currentFileName) {
+                const baseName = currentFileName.replace(/\.[^/.]+$/, '');
+                fileName = `${baseName}_traduzido.txt`;
+            }
+            
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function showLoading(show, message = 'Traduzindo...') {
+            const loadingEl = document.getElementById('loading');
+            if (show) {
+                document.getElementById('loadingText').textContent = message;
+                loadingEl.classList.add('show');
+                
+                // Atualizar progresso a cada 5 segundos
+                let seconds = 0;
+                const progressInterval = setInterval(() => {
+                    seconds += 5;
+                    const progressEl = document.getElementById('progressText');
+                    if (seconds < 30) {
+                        progressEl.textContent = 'Processando texto...';
+                    } else if (seconds < 60) {
+                        progressEl.textContent = 'Isto pode levar alguns momentos...';
+                    } else {
+                        progressEl.textContent = 'Texto longo - aguarde mais um pouco...';
+                    }
+                    
+                    if (!loadingEl.classList.contains('show')) {
+                        clearInterval(progressInterval);
+                    }
+                }, 5000);
+                
+                loadingEl.progressInterval = progressInterval;
+            } else {
+                if (loadingEl.progressInterval) {
+                    clearInterval(loadingEl.progressInterval);
+                }
+                loadingEl.classList.remove('show');
+                document.getElementById('progressText').textContent = '';
+            }
+        }
+
+        function showError(message) {
+            const errorEl = document.getElementById('error');
+            errorEl.textContent = message;
+            errorEl.classList.add('show');
+            
+            // Scroll para mostrar o erro
+            errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Auto-ocultar após 10 segundos (mais tempo para ler)
+            setTimeout(() => {
+                errorEl.classList.remove('show');
+            }, 10000);
+        }
+
+        function hideError() {
+            document.getElementById('error').classList.remove('show');
+        }
+
+        // Salvar e carregar API key
+        document.getElementById('apiKey').addEventListener('input', (e) => {
+            localStorage.setItem('anthropic_api_key', e.target.value);
+        });
+
+        // Salvar preferência de estilo
+        document.getElementById('style').addEventListener('change', (e) => {
+            localStorage.setItem('translation_style', e.target.value);
+        });
+
+        window.addEventListener('load', () => {
+            const savedKey = localStorage.getItem('anthropic_api_key');
+            if (savedKey) {
+                document.getElementById('apiKey').value = savedKey;
+            }
+            
+            const savedStyle = localStorage.getItem('translation_style');
+            if (savedStyle) {
+                document.getElementById('style').value = savedStyle;
+            }
+        });
+    </script>
+</body>
+</html>
