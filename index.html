@@ -845,10 +845,15 @@
         function showResult(text) {
             // Remover notas automáticas do Claude sobre tradução parcial
             const cleanText = text
-                .replace(/\[CONTINUA\.\.\.?\]/g, '')
+                .replace(/\[CONTINUA\.\.\.?\]/gi, '')
                 .replace(/\n?Nota: Devido ao limite.*/gs, '')
                 .replace(/\n?\[Nota: Esta é uma tradução parcial.*/gs, '')
                 .replace(/\n?Nota: Esta é apenas.*/gs, '')
+                .replace(/\[Continua traduzindo.*?\]/g, '')
+                .replace(/\[Continuação da tradução.*?\]/g, '')
+                .replace(/\[Texto traduzido.*?\]/g, '')
+                .replace(/\[.*?seguindo o mesmo padrão.*?\]/g, '')
+                .replace(/\n\n+/g, '\n\n') // Limpar quebras de linha extras
                 .trim();
             
             document.getElementById('resultText').textContent = cleanText;
