@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tradutor de Documentos</title>
+    <title>Tradutor de Documentos - Multi-API</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
     <style>
@@ -30,7 +30,7 @@
             border-radius: 12px;
             box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
-            max-width: 800px;
+            max-width: 900px;
             padding: 48px;
         }
 
@@ -40,6 +40,63 @@
             text-align: center;
             margin-bottom: 48px;
             color: #1d1d1f;
+        }
+
+        .api-selector {
+            background: #f5f5f7;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .api-selector h3 {
+            font-size: 18px;
+            margin-bottom: 16px;
+            color: #1d1d1f;
+        }
+
+        .api-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .api-option {
+            padding: 16px;
+            border: 2px solid #d2d2d7;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .api-option:hover {
+            border-color: #86868b;
+            background: #fafafa;
+        }
+
+        .api-option.selected {
+            border-color: #0071e3;
+            background: #e8f2ff;
+        }
+
+        .api-option h4 {
+            font-size: 16px;
+            margin-bottom: 4px;
+            color: #1d1d1f;
+        }
+
+        .api-option p {
+            font-size: 14px;
+            color: #86868b;
+            margin: 0;
+        }
+
+        .api-key-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
         }
 
         .form-group {
@@ -68,6 +125,11 @@
             outline: none;
             border-color: #0071e3;
             background: white;
+        }
+
+        input[type="password"]:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
         }
 
         .language-selector {
@@ -265,6 +327,128 @@
             100% { transform: rotate(360deg); }
         }
 
+        .windows-container {
+            display: none;
+            margin-bottom: 32px;
+        }
+
+        .windows-container.show {
+            display: block;
+        }
+
+        .window-header {
+            background: #f5f5f7;
+            padding: 16px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .window-header h3 {
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+
+        .window-header p {
+            font-size: 14px;
+            color: #86868b;
+            margin: 0;
+        }
+
+        .translation-window {
+            background: white;
+            border: 2px solid #d2d2d7;
+            border-radius: 8px;
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+
+        .window-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .window-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .window-status {
+            font-size: 14px;
+            padding: 4px 12px;
+            border-radius: 12px;
+            background: #f5f5f7;
+        }
+
+        .window-status.pending {
+            background: #f5f5f7;
+            color: #86868b;
+        }
+
+        .window-status.processing {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .window-status.completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .window-status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .window-preview {
+            background: #f5f5f7;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            color: #86868b;
+            max-height: 100px;
+            overflow: hidden;
+        }
+
+        .window-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .window-button {
+            padding: 8px 16px;
+            font-size: 14px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .window-button.primary {
+            background: #0071e3;
+            color: white;
+        }
+
+        .window-button.primary:hover:not(:disabled) {
+            background: #0077ed;
+        }
+
+        .window-button.secondary {
+            background: #f5f5f7;
+            color: #1d1d1f;
+        }
+
+        .window-button.secondary:hover:not(:disabled) {
+            background: #e8e8ed;
+        }
+
+        .window-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .progress-bar {
             width: 100%;
             height: 8px;
@@ -414,38 +598,6 @@
             background: #f5f5f7;
         }
 
-        .format-preview {
-            background: #f5f5f7;
-            border: 1px solid #d2d2d7;
-            border-radius: 8px;
-            padding: 16px;
-            margin-top: 16px;
-            display: none;
-            font-size: 14px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .format-preview.show {
-            display: block;
-        }
-
-        .format-preview h3 {
-            font-size: 16px;
-            margin-bottom: 8px;
-            color: #1d1d1f;
-        }
-
-        .format-preview pre {
-            background: white;
-            padding: 12px;
-            border-radius: 4px;
-            overflow-x: auto;
-            white-space: pre-wrap;
-            font-family: 'SF Mono', Monaco, monospace;
-            font-size: 12px;
-        }
-
         .result-text {
             background: #f5f5f7;
             border-radius: 8px;
@@ -501,21 +653,56 @@
             .arrow {
                 transform: rotate(90deg);
             }
+
+            .api-key-section {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Tradutor de Documentos</h1>
+        <h1>Tradutor de Documentos Multi-API</h1>
 
-        <div class="form-group">
-            <label for="apiKey">Chave API Anthropic</label>
-            <input 
-                type="password" 
-                id="apiKey" 
-                placeholder="sk-ant-api03-..." 
-                autocomplete="off"
-            >
+        <!-- Seletor de API -->
+        <div class="api-selector">
+            <h3>Escolha a API de tradução:</h3>
+            <div class="api-options">
+                <div class="api-option selected" data-provider="anthropic" data-model="claude-3-5-sonnet-20241022">
+                    <h4>Claude 3.5 Sonnet</h4>
+                    <p>Melhor qualidade • 5-15s</p>
+                </div>
+                <div class="api-option" data-provider="openai" data-model="gpt-4o">
+                    <h4>GPT-4o</h4>
+                    <p>Rápido e bom • 2-4s</p>
+                </div>
+                <div class="api-option" data-provider="openai" data-model="gpt-3.5-turbo">
+                    <h4>GPT-3.5 Turbo</h4>
+                    <p>Mais rápido • 1-2s</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chaves API -->
+        <div class="api-key-section">
+            <div class="form-group">
+                <label for="anthropicKey">Chave API Anthropic</label>
+                <input 
+                    type="password" 
+                    id="anthropicKey" 
+                    placeholder="sk-ant-api03-..." 
+                    autocomplete="off"
+                >
+            </div>
+            <div class="form-group">
+                <label for="openaiKey">Chave API OpenAI</label>
+                <input 
+                    type="password" 
+                    id="openaiKey" 
+                    placeholder="sk-..." 
+                    autocomplete="off"
+                >
+            </div>
         </div>
 
         <div class="language-selector">
@@ -596,6 +783,23 @@
             Traduzir
         </button>
 
+        <!-- Container para modo janelas -->
+        <div class="windows-container" id="windowsContainer">
+            <div class="window-header">
+                <h3>Modo Texto Grande Ativado</h3>
+                <p id="windowsInfo"></p>
+            </div>
+            <div id="windowsList"></div>
+            <div style="margin-top: 24px; display: flex; gap: 12px;">
+                <button class="window-button primary" onclick="downloadAllWindows()">
+                    📥 Baixar Todas as Traduções
+                </button>
+                <button class="window-button secondary" onclick="joinAllTranslations()">
+                    🔗 Juntar Traduções
+                </button>
+            </div>
+        </div>
+
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <p id="loadingText">Traduzindo...</p>
@@ -639,14 +843,10 @@
             </div>
             <div class="result-text" id="resultText"></div>
             <div class="result-info" id="resultInfo"></div>
-            <div class="format-preview" id="formatPreview">
-                <h3>Preview do formato:</h3>
-                <pre id="previewContent"></pre>
-            </div>
         </div>
 
         <footer>
-            Powered by <a href="https://www.anthropic.com" target="_blank">Anthropic Claude</a>
+            Powered by <a href="https://www.anthropic.com" target="_blank">Anthropic Claude</a> & <a href="https://openai.com" target="_blank">OpenAI</a>
         </footer>
     </div>
 
@@ -659,6 +859,51 @@
         let currentFileName = '';
         let translationStartTime = 0;
         let abortController = null;
+        let selectedProvider = 'anthropic';
+        let selectedModel = 'claude-3-5-sonnet-20241022';
+        
+        // Sistema de janelas
+        let windowsMode = false;
+        let textWindows = [];
+        let windowTranslations = {};
+
+        // Configuração de chunk size por provider
+        const CHUNK_SIZES = {
+            'anthropic': 2000,
+            'openai': {
+                'gpt-4o': 3000,
+                'gpt-3.5-turbo': 4000
+            }
+        };
+
+        // Tamanho máximo para modo janela
+        const WINDOW_SIZE = 20000;
+
+        // Seletor de API
+        document.querySelectorAll('.api-option').forEach(option => {
+            option.addEventListener('click', () => {
+                document.querySelectorAll('.api-option').forEach(o => o.classList.remove('selected'));
+                option.classList.add('selected');
+                selectedProvider = option.dataset.provider;
+                selectedModel = option.dataset.model;
+                
+                // Atualizar estado dos campos de API key
+                updateApiKeyFields();
+            });
+        });
+
+        function updateApiKeyFields() {
+            const anthropicField = document.getElementById('anthropicKey');
+            const openaiField = document.getElementById('openaiKey');
+            
+            if (selectedProvider === 'anthropic') {
+                anthropicField.disabled = false;
+                openaiField.disabled = true;
+            } else {
+                anthropicField.disabled = true;
+                openaiField.disabled = false;
+            }
+        }
 
         // Atualizar contador de caracteres
         document.getElementById('textInput').addEventListener('input', updateCharCount);
@@ -668,22 +913,30 @@
             const charCount = text.length;
             document.getElementById('charCount').textContent = charCount.toLocaleString('pt-BR');
             
-            // Estimativa de tempo melhorada
+            // Estimativa de tempo baseada no provider
             let timeEstimate = '';
             if (charCount > 0) {
-                if (charCount <= 3000) {
-                    timeEstimate = ' • ~10 segundos';
-                } else if (charCount <= 10000) {
-                    timeEstimate = ' • ~1 minuto';
-                } else if (charCount <= 30000) {
-                    timeEstimate = ' • ~3 minutos';
-                } else if (charCount <= 50000) {
-                    timeEstimate = ' • ~5 minutos';
-                } else if (charCount <= 100000) {
-                    timeEstimate = ' • ~10 minutos';
+                if (selectedProvider === 'openai' && selectedModel === 'gpt-3.5-turbo') {
+                    // GPT-3.5 é muito rápido
+                    if (charCount <= 10000) timeEstimate = ' • ~10 segundos';
+                    else if (charCount <= 50000) timeEstimate = ' • ~1 minuto';
+                    else timeEstimate = ' • ~2-3 minutos';
+                } else if (selectedProvider === 'openai') {
+                    // GPT-4o
+                    if (charCount <= 10000) timeEstimate = ' • ~20 segundos';
+                    else if (charCount <= 50000) timeEstimate = ' • ~2 minutos';
+                    else timeEstimate = ' • ~5 minutos';
                 } else {
-                    timeEstimate = ' • ~20+ minutos';
+                    // Claude
+                    if (charCount <= 10000) timeEstimate = ' • ~1 minuto';
+                    else if (charCount <= 50000) timeEstimate = ' • ~5 minutos';
+                    else timeEstimate = ' • ~10+ minutos';
                 }
+            }
+            
+            // Avisar sobre modo janela
+            if (charCount > WINDOW_SIZE) {
+                timeEstimate += ' • 🪟 Modo janela recomendado';
             }
             
             document.querySelector('.char-count').innerHTML = 
@@ -832,8 +1085,172 @@
             updateCharCount();
         }
 
-        // Função aprimorada para dividir texto
-        function smartSplitText(text, maxChunkSize = 3000) {
+        // Função para dividir texto em janelas
+        function createTextWindows(text, windowSize = WINDOW_SIZE) {
+            const windows = [];
+            const paragraphs = text.split(/\n\n+/);
+            let currentWindow = '';
+            let currentSize = 0;
+
+            for (const paragraph of paragraphs) {
+                if (currentSize + paragraph.length > windowSize && currentWindow) {
+                    windows.push(currentWindow.trim());
+                    currentWindow = paragraph;
+                    currentSize = paragraph.length;
+                } else {
+                    currentWindow += (currentWindow ? '\n\n' : '') + paragraph;
+                    currentSize += paragraph.length + 2;
+                }
+            }
+
+            if (currentWindow) {
+                windows.push(currentWindow.trim());
+            }
+
+            return windows;
+        }
+
+        // Mostrar janelas
+        function showWindows(windows) {
+            windowsMode = true;
+            textWindows = windows;
+            windowTranslations = {};
+
+            const container = document.getElementById('windowsContainer');
+            const list = document.getElementById('windowsList');
+            const info = document.getElementById('windowsInfo');
+
+            info.textContent = `Seu texto tem ${document.getElementById('textInput').value.length.toLocaleString('pt-BR')} caracteres e foi dividido em ${windows.length} janelas.`;
+
+            list.innerHTML = '';
+
+            windows.forEach((window, index) => {
+                const windowDiv = document.createElement('div');
+                windowDiv.className = 'translation-window';
+                windowDiv.innerHTML = `
+                    <div class="window-info">
+                        <div class="window-title">Janela ${index + 1} de ${windows.length}</div>
+                        <div class="window-status pending" id="status-${index}">⏸️ Aguardando</div>
+                    </div>
+                    <div class="window-preview">${window.substring(0, 150)}...</div>
+                    <div class="window-actions">
+                        <button class="window-button secondary" onclick="viewWindowText(${index})">
+                            📝 Ver Texto
+                        </button>
+                        <button class="window-button primary" id="translate-${index}" onclick="translateWindow(${index})">
+                            🔄 Traduzir
+                        </button>
+                        <button class="window-button secondary" id="download-${index}" onclick="downloadWindow(${index})" disabled>
+                            📥 Baixar
+                        </button>
+                    </div>
+                    <div class="progress-bar" id="window-progress-${index}">
+                        <div class="progress-fill" id="window-progress-fill-${index}"></div>
+                    </div>
+                `;
+                list.appendChild(windowDiv);
+            });
+
+            container.classList.add('show');
+            document.getElementById('translateButton').style.display = 'none';
+            document.getElementById('resultSection').classList.remove('show');
+        }
+
+        // Ver texto da janela
+        window.viewWindowText = function(index) {
+            const text = textWindows[index];
+            document.getElementById('textInput').value = text;
+            document.getElementById('textInput').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Traduzir janela específica
+        window.translateWindow = async function(index) {
+            const text = textWindows[index];
+            const apiKey = getApiKey();
+            const sourceLang = document.getElementById('sourceLang').value;
+            const targetLang = document.getElementById('targetLang').value;
+            const style = document.getElementById('style').value;
+
+            if (!apiKey) {
+                showError(`Por favor, insira a chave API ${selectedProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'}.`);
+                return;
+            }
+
+            // Atualizar status
+            const statusEl = document.getElementById(`status-${index}`);
+            const translateBtn = document.getElementById(`translate-${index}`);
+            const downloadBtn = document.getElementById(`download-${index}`);
+            const progressBar = document.getElementById(`window-progress-${index}`);
+            const progressFill = document.getElementById(`window-progress-fill-${index}`);
+
+            statusEl.className = 'window-status processing';
+            statusEl.textContent = '🔄 Processando...';
+            translateBtn.disabled = true;
+            progressBar.classList.add('show');
+
+            try {
+                // Obter chunk size apropriado
+                const chunkSize = selectedProvider === 'anthropic' 
+                    ? CHUNK_SIZES.anthropic 
+                    : CHUNK_SIZES.openai[selectedModel];
+                
+                const chunks = smartSplitText(text, chunkSize);
+                const translations = [];
+
+                for (let i = 0; i < chunks.length; i++) {
+                    const progress = ((i + 1) / chunks.length) * 100;
+                    progressFill.style.width = progress + '%';
+                    statusEl.textContent = `🔄 Traduzindo parte ${i + 1}/${chunks.length}...`;
+
+                    const translation = await callTranslationAPI(
+                        apiKey,
+                        chunks[i],
+                        sourceLang,
+                        targetLang,
+                        style,
+                        i,
+                        chunks.length
+                    );
+
+                    if (translation) {
+                        translations.push(translation);
+                    }
+
+                    // Pequeno delay entre chunks
+                    if (i < chunks.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+
+                const fullTranslation = translations.join('\n\n');
+                windowTranslations[index] = fullTranslation;
+
+                statusEl.className = 'window-status completed';
+                statusEl.textContent = '✅ Concluída';
+                downloadBtn.disabled = false;
+                progressBar.classList.remove('show');
+
+            } catch (error) {
+                statusEl.className = 'window-status error';
+                statusEl.textContent = '❌ Erro';
+                showError(`Erro na janela ${index + 1}: ${error.message}`);
+                progressBar.classList.remove('show');
+            } finally {
+                translateBtn.disabled = false;
+            }
+        }
+
+        // Função para obter API key correta
+        function getApiKey() {
+            if (selectedProvider === 'anthropic') {
+                return document.getElementById('anthropicKey').value.trim();
+            } else {
+                return document.getElementById('openaiKey').value.trim();
+            }
+        }
+
+        // Função para dividir texto inteligentemente
+        function smartSplitText(text, maxChunkSize) {
             if (text.length <= maxChunkSize) {
                 return [text];
             }
@@ -843,15 +1260,13 @@
             let currentChunk = '';
 
             for (const paragraph of paragraphs) {
-                // Se um parágrafo sozinho for maior que o limite
                 if (paragraph.length > maxChunkSize) {
-                    // Salva chunk atual se houver
                     if (currentChunk.trim()) {
                         chunks.push(currentChunk.trim());
                         currentChunk = '';
                     }
 
-                    // Divide parágrafo grande por sentenças
+                    // Dividir parágrafo grande por sentenças
                     const sentences = paragraph.match(/[^.!?]+[.!?]+/g) || [paragraph];
                     
                     for (const sentence of sentences) {
@@ -874,19 +1289,18 @@
                 chunks.push(currentChunk.trim());
             }
 
-            console.log(`Texto dividido em ${chunks.length} partes`);
             return chunks;
         }
 
         async function translate() {
-            const apiKey = document.getElementById('apiKey').value.trim();
+            const apiKey = getApiKey();
             const text = document.getElementById('textInput').value.trim();
             const sourceLang = document.getElementById('sourceLang').value;
             const targetLang = document.getElementById('targetLang').value;
             const style = document.getElementById('style').value;
 
             if (!apiKey) {
-                showError('Por favor, insira sua chave API da Anthropic.');
+                showError(`Por favor, insira a chave API ${selectedProvider === 'anthropic' ? 'Anthropic' : 'OpenAI'}.`);
                 return;
             }
 
@@ -900,24 +1314,42 @@
                 return;
             }
 
+            // Verificar se deve usar modo janela
+            if (text.length > WINDOW_SIZE) {
+                const useWindows = confirm(
+                    `Texto muito grande (${text.length.toLocaleString('pt-BR')} caracteres)!\n\n` +
+                    `Recomendamos usar o modo janela para melhor controle.\n\n` +
+                    `Deseja dividir em janelas menores?`
+                );
+
+                if (useWindows) {
+                    const windows = createTextWindows(text, WINDOW_SIZE);
+                    showWindows(windows);
+                    return;
+                }
+            }
+
             hideError();
             hideWarning();
             document.getElementById('translateButton').disabled = true;
             document.getElementById('resultSection').classList.remove('show');
             
-            // Marcar início da tradução
             translationStartTime = Date.now();
             abortController = new AbortController();
 
             try {
-                const chunks = smartSplitText(text, 3000);
+                const chunkSize = selectedProvider === 'anthropic' 
+                    ? CHUNK_SIZES.anthropic 
+                    : CHUNK_SIZES.openai[selectedModel];
+                
+                const chunks = smartSplitText(text, chunkSize);
                 
                 if (chunks.length > 1) {
-                    showWarning(`⚠️ Texto grande! Dividindo em ${chunks.length} partes para garantir tradução completa.`);
+                    showWarning(`⚠️ Texto dividido em ${chunks.length} partes para melhor processamento.`);
                     translatedText = await translateInChunks(apiKey, chunks, sourceLang, targetLang, style);
                 } else {
                     showLoading(true, 'Traduzindo...');
-                    translatedText = await callAnthropicAPI(apiKey, text, sourceLang, targetLang, style);
+                    translatedText = await callTranslationAPI(apiKey, text, sourceLang, targetLang, style);
                 }
                 
                 if (translatedText) {
@@ -928,12 +1360,6 @@
             } catch (error) {
                 if (error.name === 'AbortError') {
                     showError('Tradução cancelada');
-                } else if (error.message.includes('402')) {
-                    showError('Erro 402: Créditos insuficientes na API. Verifique seu saldo em console.anthropic.com');
-                } else if (error.message.includes('401')) {
-                    showError('Erro 401: Chave API inválida. Verifique se está correta.');
-                } else if (error.message.includes('429')) {
-                    showError('Erro 429: Muitas requisições. Aguarde um momento e tente novamente.');
                 } else {
                     showError('Erro na tradução: ' + error.message);
                 }
@@ -947,7 +1373,6 @@
 
         async function translateInChunks(apiKey, chunks, sourceLang, targetLang, style) {
             const translations = [];
-            const failedParts = [];
             showProgressBar();
             
             for (let i = 0; i < chunks.length; i++) {
@@ -955,16 +1380,15 @@
                     throw new Error('Tradução cancelada');
                 }
 
-                const progress = ((i) / chunks.length) * 100;
+                const progress = ((i + 1) / chunks.length) * 100;
                 updateProgress(progress, `Traduzindo parte ${i + 1} de ${chunks.length}...`);
-                updateProgressDetails(`Partes concluídas: ${i}/${chunks.length} | Falhas: ${failedParts.length}`);
                 
-                let retries = 3;
+                let retries = 2;
                 let translated = null;
                 
                 while (retries > 0 && !translated) {
                     try {
-                        translated = await callAnthropicAPI(
+                        translated = await callTranslationAPI(
                             apiKey, 
                             chunks[i], 
                             sourceLang, 
@@ -978,51 +1402,29 @@
                             translations.push(translated);
                             console.log(`✓ Parte ${i + 1} traduzida: ${translated.length} caracteres`);
                             break;
-                        } else {
-                            throw new Error('Tradução vazia');
                         }
                     } catch (error) {
                         retries--;
                         console.error(`✗ Erro na parte ${i + 1}, tentativas restantes: ${retries}`, error);
                         
                         if (retries > 0) {
-                            // Espera progressiva entre tentativas
-                            const waitTime = (3 - retries) * 2000; // 2s, 4s, 6s
-                            updateProgressDetails(`Erro na parte ${i + 1}. Aguardando ${waitTime/1000}s para tentar novamente...`);
-                            await new Promise(resolve => setTimeout(resolve, waitTime));
+                            await new Promise(resolve => setTimeout(resolve, 2000));
                         } else {
-                            failedParts.push(i + 1);
                             translations.push(`[ERRO NA TRADUÇÃO DA PARTE ${i + 1}]`);
                         }
                     }
                 }
                 
-                // Delay entre partes bem-sucedidas
+                // Delay entre partes
                 if (i < chunks.length - 1) {
-                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    await new Promise(resolve => setTimeout(resolve, 1000));
                 }
-            }
-            
-            updateProgress(100, 'Tradução concluída!');
-            
-            if (failedParts.length > 0) {
-                showWarning(`⚠️ ATENÇÃO: ${failedParts.length} parte(s) falharam: ${failedParts.join(', ')}. Verifique o resultado.`);
-            }
-            
-            if (translations.length === 0) {
-                throw new Error('Nenhuma parte foi traduzida com sucesso');
-            }
-            
-            // Verifica integridade
-            const successRate = (translations.length - failedParts.length) / chunks.length;
-            if (successRate < 0.8) {
-                showWarning(`⚠️ Apenas ${Math.round(successRate * 100)}% do texto foi traduzido com sucesso.`);
             }
             
             return translations.join('\n\n');
         }
 
-        async function callAnthropicAPI(apiKey, text, sourceLang, targetLang, style, partIndex, totalParts) {
+        async function callTranslationAPI(apiKey, text, sourceLang, targetLang, style, partIndex, totalParts) {
             try {
                 const response = await fetch('/api/translate', {
                     method: 'POST',
@@ -1035,6 +1437,8 @@
                         sourceLang,
                         targetLang,
                         style,
+                        provider: selectedProvider,
+                        model: selectedModel,
                         partIndex,
                         totalParts
                     }),
@@ -1044,19 +1448,11 @@
                 const data = await response.json();
 
                 if (!response.ok) {
-                    if (data.timeout) {
-                        throw new Error('Timeout - tente um texto menor');
-                    }
                     throw new Error(data.error || `Erro ${response.status}`);
                 }
 
                 if (!data.success || !data.translation) {
                     throw new Error('Resposta inválida da API');
-                }
-
-                // Log para debug
-                if (partIndex !== undefined) {
-                    console.log(`Parte ${partIndex + 1}: Original ${data.originalLength} → Tradução ${data.translationLength} (${Math.round(data.translationLength/data.originalLength*100)}%)`);
                 }
 
                 return data.translation;
@@ -1072,16 +1468,12 @@
                 return;
             }
             
-            // Limpar marcações
-            const cleanText = text
-                .replace(/\[ERRO NA TRADUÇÃO DA PARTE \d+\]/g, match => `\n\n${match}\n\n`)
-                .trim();
+            const cleanText = text.trim();
             
             document.getElementById('resultText').textContent = cleanText;
             translatedText = cleanText;
             document.getElementById('resultSection').classList.add('show');
             
-            // Estatísticas
             const translationTime = Math.round((Date.now() - translationStartTime) / 1000);
             const originalLength = document.getElementById('textInput').value.length;
             const translatedLength = cleanText.length;
@@ -1090,14 +1482,9 @@
             document.getElementById('resultInfo').innerHTML = 
                 `Original: ${originalLength.toLocaleString('pt-BR')} chars | ` +
                 `Tradução: ${translatedLength.toLocaleString('pt-BR')} chars (${ratio}%) | ` +
-                `Tempo: ${translationTime}s`;
+                `Tempo: ${translationTime}s | ` +
+                `API: ${selectedProvider === 'anthropic' ? 'Claude' : selectedModel}`;
             
-            // Verificar se parece completo
-            if (ratio < 70) {
-                showWarning('⚠️ A tradução parece estar incompleta (menos de 70% do tamanho original).');
-            }
-            
-            // Scroll
             setTimeout(() => {
                 document.getElementById('resultSection').scrollIntoView({ 
                     behavior: 'smooth', 
@@ -1106,15 +1493,91 @@
             }, 100);
         }
 
+        // Funções para janelas
+        window.downloadWindow = function(index) {
+            const translation = windowTranslations[index];
+            if (!translation) return;
+
+            const blob = new Blob([translation], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            let fileName = `traducao_janela_${index + 1}.txt`;
+            if (currentFileName) {
+                const baseName = currentFileName.replace(/\.[^/.]+$/, '');
+                fileName = `${baseName}_janela_${index + 1}.txt`;
+            }
+            
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.downloadAllWindows = function() {
+            const translations = [];
+            for (let i = 0; i < textWindows.length; i++) {
+                if (windowTranslations[i]) {
+                    translations.push(`=== JANELA ${i + 1} ===\n\n${windowTranslations[i]}`);
+                }
+            }
+
+            if (translations.length === 0) {
+                showError('Nenhuma janela foi traduzida ainda.');
+                return;
+            }
+
+            const blob = new Blob([translations.join('\n\n\n')], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            
+            let fileName = 'traducao_completa.txt';
+            if (currentFileName) {
+                const baseName = currentFileName.replace(/\.[^/.]+$/, '');
+                fileName = `${baseName}_traduzido_completo.txt`;
+            }
+            
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        window.joinAllTranslations = function() {
+            const translations = [];
+            for (let i = 0; i < textWindows.length; i++) {
+                if (windowTranslations[i]) {
+                    translations.push(windowTranslations[i]);
+                } else {
+                    translations.push(`[JANELA ${i + 1} NÃO TRADUZIDA]`);
+                }
+            }
+
+            const joinedText = translations.join('\n\n');
+            translatedText = joinedText;
+            
+            // Mostrar na seção de resultado
+            document.getElementById('resultText').textContent = joinedText;
+            document.getElementById('resultSection').classList.add('show');
+            document.getElementById('windowsContainer').classList.remove('show');
+            document.getElementById('translateButton').style.display = 'block';
+            
+            const originalLength = document.getElementById('textInput').value.length;
+            const translatedLength = joinedText.length;
+            const ratio = (translatedLength / originalLength * 100).toFixed(0);
+            
+            document.getElementById('resultInfo').innerHTML = 
+                `Tradução unificada de ${textWindows.length} janelas | ` +
+                `Total: ${translatedLength.toLocaleString('pt-BR')} chars (${ratio}%)`;
+        }
+
         function updateProgress(percent, message) {
             document.getElementById('progressFill').style.width = percent + '%';
             document.getElementById('progressText').textContent = message;
-        }
-
-        function updateProgressDetails(details) {
-            const detailsEl = document.getElementById('progressDetails');
-            detailsEl.textContent = details;
-            detailsEl.classList.add('show');
         }
 
         function showProgressBar() {
@@ -1124,7 +1587,6 @@
 
         function hideProgressBar() {
             document.getElementById('progressBar').classList.remove('show');
-            document.getElementById('progressDetails').classList.remove('show');
         }
 
         function showWarning(message) {
@@ -1239,7 +1701,7 @@
     <div class="metadata">
         <p><strong>Documento original:</strong> ${currentFileName || 'Texto inserido'}</p>
         <p><strong>Data da tradução:</strong> ${new Date().toLocaleDateString('pt-BR')}</p>
-        <p><strong>Traduzido por:</strong> Anthropic Claude</p>
+        <p><strong>API utilizada:</strong> ${selectedProvider === 'anthropic' ? 'Claude' : selectedModel}</p>
     </div>
     ${htmlContent}
 </body>
@@ -1261,8 +1723,6 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            showFormatPreview('HTML', fullHTML);
         }
 
         function downloadMarkdown() {
@@ -1271,7 +1731,7 @@
 
 **Documento original:** ${currentFileName || 'Texto inserido'}  
 **Data:** ${new Date().toLocaleDateString('pt-BR')}  
-**Traduzido por:** Anthropic Claude
+**API:** ${selectedProvider === 'anthropic' ? 'Claude 3.5' : selectedModel}
 
 ---
 
@@ -1293,8 +1753,6 @@ ${markdownContent}`;
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-
-            showFormatPreview('Markdown', fullContent);
         }
 
         function convertToHTML(text) {
@@ -1373,25 +1831,6 @@ ${markdownContent}`;
             return markdown;
         }
 
-        function showFormatPreview(format, content) {
-            const preview = document.getElementById('formatPreview');
-            const previewContent = document.getElementById('previewContent');
-            
-            preview.querySelector('h3').textContent = `Preview do ${format}:`;
-            
-            if (format === 'HTML') {
-                previewContent.textContent = content.substring(0, 1000) + '...';
-            } else {
-                previewContent.textContent = content.substring(0, 500) + '...';
-            }
-            
-            preview.classList.add('show');
-            
-            setTimeout(() => {
-                preview.classList.remove('show');
-            }, 5000);
-        }
-
         function showLoading(show, message = 'Traduzindo...') {
             const loadingEl = document.getElementById('loading');
             if (show) {
@@ -1415,9 +1854,13 @@ ${markdownContent}`;
             document.getElementById('error').classList.remove('show');
         }
 
-        // Salvar e carregar API key
-        document.getElementById('apiKey').addEventListener('input', (e) => {
+        // Salvar e carregar API keys
+        document.getElementById('anthropicKey').addEventListener('input', (e) => {
             localStorage.setItem('anthropic_api_key', e.target.value);
+        });
+
+        document.getElementById('openaiKey').addEventListener('input', (e) => {
+            localStorage.setItem('openai_api_key', e.target.value);
         });
 
         // Salvar preferência de estilo
@@ -1434,15 +1877,23 @@ ${markdownContent}`;
         });
 
         window.addEventListener('load', () => {
-            const savedKey = localStorage.getItem('anthropic_api_key');
-            if (savedKey) {
-                document.getElementById('apiKey').value = savedKey;
+            const savedAnthropicKey = localStorage.getItem('anthropic_api_key');
+            if (savedAnthropicKey) {
+                document.getElementById('anthropicKey').value = savedAnthropicKey;
+            }
+            
+            const savedOpenAIKey = localStorage.getItem('openai_api_key');
+            if (savedOpenAIKey) {
+                document.getElementById('openaiKey').value = savedOpenAIKey;
             }
             
             const savedStyle = localStorage.getItem('translation_style');
             if (savedStyle) {
                 document.getElementById('style').value = savedStyle;
             }
+            
+            // Atualizar campos de API key
+            updateApiKeyFields();
         });
     </script>
 </body>
